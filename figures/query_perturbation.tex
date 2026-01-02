@@ -1,0 +1,43 @@
+\begin{tikzpicture}[scale=0.75, transform shape, >=Stealth, font=\small]
+    % Define local colors
+    \definecolor{c0l}{RGB}{250, 218, 221} \definecolor{c0m}{RGB}{240, 128, 128} \definecolor{c0d}{RGB}{220, 20, 60}
+    \definecolor{c1l}{RGB}{200, 240, 200} \definecolor{c1m}{RGB}{144, 238, 144} \definecolor{c1d}{RGB}{34, 139, 34}
+    \definecolor{c2l}{RGB}{173, 216, 230} \definecolor{c2m}{RGB}{100, 149, 237} \definecolor{c2d}{RGB}{30, 144, 255}
+    \definecolor{c3l}{RGB}{255, 250, 205} \definecolor{c3m}{RGB}{255, 215, 0}   \definecolor{c3d}{RGB}{255, 165, 0}
+
+    % LEVEL 1: Base Queries
+    \node[draw, fill=gray!10, minimum width=5cm, minimum height=0.7cm] (base) at (0, 0) {Base Queries in the Dataset};
+    
+    % LEVEL 2: Split Nodes (S0 - S3)
+    \foreach \i/\col in {0/c0l, 1/c1l, 2/c2l, 3/c3l} {
+        \node[draw, fill=\col, minimum width=1.0cm, minimum height=0.8cm] (s\i) at ({(\i-1.5)*1.0}, -1.75) {S\i};
+    }
+    
+    % LEVEL 3: Perturbations (C_i,j)
+    \def\groupspace{2.5} % horizontal space between groups
+    \foreach \i/\cbase in {0/c0, 1/c1, 2/c2, 3/c3} {
+        \foreach \j in {0,1,2} {
+            \pgfmathsetmacro{\xpos}{(\i-1.5)*\groupspace + (\j-1)*0.65}
+            \ifcase\j \colorlet{cc}{\cbase l} \or \colorlet{cc}{\cbase m} \or \colorlet{cc}{\cbase d} \fi
+            \node[draw, fill=cc, minimum size=0.6cm] (c\i\j) at (\xpos, -3.8) {\scriptsize C\i,\j};
+            
+            % Dotted guides from S to middle child
+            \ifnum\j=1
+                \draw[->, gray, thin, dashed] (s\i.south) -- (c\i\j.north);
+            \fi
+        }
+        
+        % Dots between groups
+        \ifnum\i>0
+            \path (c\the\numexpr\i-1\relax2.east) -- (c\i0.west) node[midway] {\dots};
+        \fi
+    }
+
+    % Main logic arrows
+    \draw[->, dotted, thick] (base.south) -- (0, -1.25) node[midway, right] {\scriptsize $N\_Split=4$};
+    
+    % Middle label area
+    \node[right] at (0.2, -2.8) {\scriptsize $Noise\_Ratio=0.01$};
+    \draw[->, dotted, thick] (0,-2.25) -- (0,-3.4);
+
+\end{tikzpicture}

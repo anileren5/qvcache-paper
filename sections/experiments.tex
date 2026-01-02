@@ -1,0 +1,545 @@
+\begin{table}[!htbp]
+\centering
+\small
+\begin{tabular}{lrrrr}
+\toprule
+\textbf{Dataset} & \textbf{\#Vectors} & \textbf{Dim.} & \textbf{Metric} & \textbf{\#Queries} \\
+\midrule
+SIFT        & 1{,}000{,}000{,}000 & 128 & L2     & 10{,}000 \\
+SpaceV\footnotemark[1] & 100{,}000{,}000     & 100 & L2     & 29{,}316 \\
+DEEP\footnotemark[1]   & 10{,}000{,}000      & 96  & L2     & 10{,}000 \\
+GIST        & 1{,}000{,}000       & 960 & L2     & 1{,}000 \\
+GloVe       & 1{,}000{,}000       & 100 & Cosine & 10{,}000 \\
+\bottomrule
+\end{tabular}
+\caption{Dataset statistics}
+\label{tab:datasets}
+\end{table}
+
+\footnotetext[1]{For \textsc{SpaceV} and \textsc{DEEP}, we use the first 100M and 10M vectors of the respective datasets.}
+
+\section{Experiments}
+
+\subsection{Experimental Setup}
+We implement QVCache in C++, together with Python bindings. All experiments are conducted on a Linux system in a containerized Docker environment, equipped with an Intel Xeon Gold 5118 processor, 2.30GHz, with 24 physical cores, 376GB of DDR4 RAM, and a Dell Express Flash PM1725a 1.6TB NVMe SSD.
+
+\textbf{Datasets.} We evaluate how well QVCache generalizes across diverse data by benchmarking it on five datasets that differ in scale, domain, and dimensionality, as summarized in Table~\ref{tab:datasets} \cite{sift, deep, gist, pennington-etal-2014-glove, SPACEV1B_SPTAG}. 
+
+\textbf{Backends.} We evaluate QVCache across a range of backend databases to understand its performance under diverse scenarios. We employ the DiskANN implementation by Yu et al. (2025) \cite{yu2025topologyawarelocalizedupdatestrategy} thanks to its convenience for benchmarking QVCache across multiple datasets. Additionally, we test QVCache with FAISS \cite{faiss} (an in-memory store, on CPU), pgvector \cite{pgvector} (a disk-based database), Qdrant \cite{qdrant2025} (a hybrid setup), Pinecone \cite{pinecone} (a managed cloud service) and SPANN \cite{spann} (a tree-navigated centroid graph) to assess its effectiveness with backends having different characteristics.
+
+\textbf{Metrics.} We evaluate QVCache using six metrics, as illustrated in Figures \ref{fig:dataset-experiments} and \ref{fig:backend-experiments}. Metrics are collected at the granularity of splits, with each dot representing a single split. The \emph{cache hit ratio} measures the fraction of queries served by QVCache without forwarding requests to the backend database, while \emph{hit latency} captures the latency of these queries. We intentionally omit P99 latency because, unless QVCache achieves a hit ratio above 99\%, P99 is dominated by queries that miss the cache and are served by the backend, yielding no meaningful distinction between configurations. Instead, we use P50 latency to evaluate overall latency performance, independent of cache hits or misses.
+Although QVCache is primarily designed for low-latency responses, it also improves throughput; we report metrics reflecting this benefit. To measure query accuracy, we use k-recall@k (with k = 10). We also track the number of vectors retrieved from the backend into the cache over time to assess eviction behavior. 
+
+
+\begin{figure*}[t]
+\centering
+% Define the column width for 5 columns (Using 0.195\textwidth for slight height increase)
+\newlength{\colwidth}
+\setlength{\colwidth}{0.195\textwidth}
+
+% Column Order: sift, spacev100m, deep10m, text2image, glove
+
+% ===== Row 1: hit_ratio =====
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/dataset_experiments/bigann/hit_ratio.pdf}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/dataset_experiments/spacev1b_100m/hit_ratio.pdf}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/dataset_experiments/deep10m/hit_ratio.pdf}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/dataset_experiments/gist/hit_ratio.pdf}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/dataset_experiments/glove/hit_ratio.pdf}
+\end{subfigure}
+\\ % Add vertical space between rows
+
+% ===== Row 2: avg_hit_latency (where the "shift" was observed) =====
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/dataset_experiments/bigann/avg_hit_latency.pdf}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/dataset_experiments/spacev1b_100m/avg_hit_latency.pdf}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/dataset_experiments/deep10m/avg_hit_latency.pdf}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/dataset_experiments/gist/avg_hit_latency.pdf}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/dataset_experiments/glove/avg_hit_latency.pdf}
+\end{subfigure}
+\\ % Add vertical space between rows
+
+% ===== Row 3: p50_latency =====
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/dataset_experiments/bigann/p50_latency.pdf}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/dataset_experiments/spacev1b_100m/p50_latency.pdf}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/dataset_experiments/deep10m/p50_latency.pdf}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/dataset_experiments/gist/p50_latency.pdf}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/dataset_experiments/glove/p50_latency.pdf}
+\end{subfigure}
+\\ % Add vertical space between rows
+
+% ===== Row 4: qps =====
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/dataset_experiments/bigann/qps.pdf}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/dataset_experiments/spacev1b_100m/qps.pdf}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/dataset_experiments/deep10m/qps.pdf}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/dataset_experiments/gist/qps.pdf}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/dataset_experiments/glove/qps.pdf}
+\end{subfigure}
+\\ % Add vertical space between rows
+
+% ===== Row 5: recall =====
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/dataset_experiments/bigann/recall.pdf}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/dataset_experiments/spacev1b_100m/recall.pdf}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/dataset_experiments/deep10m/recall.pdf}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/dataset_experiments/gist/recall.pdf}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/dataset_experiments/glove/recall.pdf}
+\end{subfigure}
+
+% ===== Row 6: Memory Active Vectors =====
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/dataset_experiments/bigann/memory_active_vectors.pdf}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/dataset_experiments/spacev1b_100m/memory_active_vectors.pdf}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/dataset_experiments/deep10m/memory_active_vectors.pdf}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/dataset_experiments/gist/memory_active_vectors.pdf}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/dataset_experiments/glove/memory_active_vectors.pdf}
+\end{subfigure}
+
+% ===== Row 7: Column captions (Datasets) =====
+\begin{subfigure}{\colwidth}
+    \centering
+    \vspace{0.8em}
+    (a) \textbf{SIFT}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \centering
+    \vspace{0.8em}
+    (b) \textbf{SpaceV}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \centering
+    \vspace{0.8em}
+    (c) \textbf{DEEP}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \centering
+    \vspace{0.8em}
+    (d) \textbf{GIST}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \centering
+    \vspace{0.8em}
+    (e) \textbf{GloVe}
+\end{subfigure}
+
+\caption{Backend (DiskANN) alone versus DiskANN augmented with QVCache across six metrics and five datasets.}
+
+\label{fig:dataset-experiments}
+\end{figure*}
+
+\subsection{Query-Awareness Under Distribution Shifts}
+
+\subsection{Eviction Dynamics under Recurring Query Patterns}
+
+\begin{figure}[h]
+\centering
+
+% Two columns → ~0.48 of column width each
+\setlength{\colwidth}{0.48\columnwidth}
+
+% ===== Row 1: hit_ratio =====
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/total_cache_size_experiments/hit_ratio.pdf}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/partitioning_experiments/hit_ratio.pdf}
+\end{subfigure}
+\\[0.5em]
+
+% ===== Row 5: recall =====
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/total_cache_size_experiments/recall.pdf}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/partitioning_experiments/recall.pdf}
+\end{subfigure}
+\\[0.5em]
+
+% ===== Row 6: memory_active_vectors =====
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/total_cache_size_experiments/memory_active_vectors.pdf}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/partitioning_experiments/memory_active_vectors.pdf}
+\end{subfigure}
+\\[0.8em]
+
+% ===== Column Labels (shifted right) =====
+\begin{subfigure}{\colwidth}
+    \centering
+    \hspace{0.7em}(a) $n_{\text{mini-index}} = 2$
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \centering
+    \hspace{0.7em}(b) $n_{\text{mini-index}} = 4$
+\end{subfigure}
+
+\caption{
+Impact of Cache Capacity on QVCache Performance Across Recurring Query Distributions
+}
+\label{fig:eviction_pressure_comp25}
+\end{figure}
+
+\begin{figure}[h]
+    \centering
+
+    \begin{subfigure}{0.7\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{plots/granularity_experiments/avg_hit_latency.pdf}
+        \label{fig:plot1}
+    \end{subfigure}
+
+    \caption{Impact of mini-index granularity on QVCache performance. The total cache capacity is fixed at 50{,}000 vectors, while the number of mini-indexes is varied to control per–mini-index capacity.
+}
+    \label{fig:granularity-effect}
+\end{figure}
+
+\subsection{Granularity Matters: Balancing Eviction Cost and Hit Latency}
+
+\begin{figure}[h]
+    \centering
+    \begin{subfigure}{0.48\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{plots/deviation_factor_experiments/hit_ratio.pdf}
+    \end{subfigure}\hfill
+    \begin{subfigure}{0.48\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{plots/deviation_factor_experiments/recall.pdf}
+    \end{subfigure}
+
+    \caption{Deviation Factor Effect on Recall and Hit Ratio}
+    \label{fig:deviation-factor-experiment}
+\end{figure}
+
+\subsection{Controlling Recall and Cache Hit Ratio via Deviation Factor}
+
+\begin{figure}[h]
+    \centering
+
+    \begin{subfigure}{0.7\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{plots/spatial_threshold_experiments/recall.pdf}
+        \label{fig:plot1}
+    \end{subfigure}
+
+    \caption{Impact of Global vs. Spatial Threshold(s) on Recall}
+    \label{fig:spatial-threshold-experiment}
+\end{figure}
+
+
+\subsection{Spatial Thresholds Are Key to Correct Cache Hit/Miss Decisions}
+
+As illustrated in Figure \ref{fig:spatial-thresholds}, vector distributions vary significantly across the vector space: some regions are densely clustered, while others are sparse. This heterogeneity makes it impractical to rely on a single global similarity threshold for all cache hit decisions.
+
+To evaluate this effect, we repeated the experiment from Section 5.2 on the SIFT dataset under two configurations: one using a single global threshold and the other using spatial thresholds. As shown in Figure~\ref{fig:spatial-threshold-experiment}, the global threshold aggregates updates from cache misses across all regions, failing to capture local patterns and causing up to a 15\% loss in recall due to incorrect hit/miss decisions. In contrast, spatial thresholds adapt to local variations in the query distribution, limiting recall degradation to at most 2–3\%, demonstrating their effectiveness in preserving the backend database’s accuracy.
+
+
+\begin{figure}[h]
+    \centering
+
+    % Row 1: Hit Ratio
+    \begin{minipage}{0.48\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{plots/pca_experiments/d_reduced/hit_ratio.pdf}
+        \subcaption{$d_{\text{reduced}}$ — Hit Ratio}
+    \end{minipage}\hfill
+    \begin{minipage}{0.48\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{plots/pca_experiments/n_buckets/hit_ratio.pdf}
+        \subcaption{$n_{\text{buckets}}$ — Hit Ratio}
+    \end{minipage}
+
+    \vspace{0.8em}
+
+    % Row 2: Recall
+    \begin{minipage}{0.48\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{plots/pca_experiments/d_reduced/recall.pdf}
+        \subcaption{$d_{\text{reduced}}$ — Recall}
+    \end{minipage}\hfill
+    \begin{minipage}{0.48\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{plots/pca_experiments/n_buckets/recall.pdf}
+        \subcaption{$n_{\text{buckets}}$ — Recall}
+    \end{minipage}
+
+    \caption{Impact of granularity of space partitioning and dimensionality reduction on recall and hit ratio. Left: varying $d_{\text{reduced}}$ (fixed $n_{\text{buckets}}$). Right: varying $n_{\text{buckets}}$ (fixed $d_{\text{reduced}}$).}
+
+    \label{fig:pca_experiments}
+\end{figure}
+
+
+\subsection{Sensitivity Analysis: Space Partitioning and Dimensionality Reduction}
+
+We evaluate QVCache’s sensitivity to the granularity of space partitioning ($n_{buckets}$) and dimensionality reduction ($d_{reduced}$) by repeating the experiment from Figure \ref{fig:dataset-experiments} on the GIST dataset with $WINDOW\_SIZE = 1$ and $stride = 1$. As shown in Figure \ref{fig:pca_experiments}, the left column fixes $d_{reduced}$ at 16 and varies $n_{buckets}$, while the right column fixes $n_{buckets}$ at 8 and varies $d_{reduced}$, reporting the resulting hit ratio and recall.
+
+GIST vectors have 960 dimensions. Increasing $d_{reduced}$ to 128 or higher provides only a modest improvement in recall (around 3–4\%) while significantly reducing the hit ratio, highlighting the effectiveness of dimensionality reduction for guiding cache hit–miss decisions.
+
+Similarly, increasing $n_{buckets}$ from 8 to 128 yields an average recall improvement of roughly 5\% but heavily reduces the hit ratio. This behavior arises because \ref{alg:learn-threshold} overfits local patterns and fails to generalize across queries.
+
+
+\begin{table}[h]
+\centering
+\captionsetup{skip=6pt}
+\small % Reduces font size; use \footnotesize for even smaller
+\renewcommand{\arraystretch}{1.0} % Reduced from 1.15
+\setlength{\tabcolsep}{4pt}    % Reduced from 6pt
+
+\begin{tabular}{|>{\centering\arraybackslash}m{2.2cm}|c|c|c|c|c|c|}
+\hline
+\diagbox[width=2.2cm,height=0.9cm]
+{$c_{\text{mini-index}}$}{$n_{\text{mini-index}}$}
+& 1 & 2 & 4 & 8 & 16 & 32 \\
+\hline
+3{,}125
+& \cellcolor{gray!25}16
+& \cellcolor{orange!25}24
+& \cellcolor{yellow!25}37
+& \cellcolor{green!25}62
+& \cellcolor{blue!25}113
+& \cellcolor{purple!25}219 \\
+\hline
+6{,}250
+& \cellcolor{orange!25}18
+& \cellcolor{yellow!25}34
+& \cellcolor{green!25}56
+& \cellcolor{blue!25}100
+& \cellcolor{purple!25}189
+& \\
+\hline
+12{,}500
+& \cellcolor{yellow!25}23
+& \cellcolor{green!25}58
+& \cellcolor{blue!25}99
+& \cellcolor{purple!25}183
+& & \\
+\hline
+25{,}000
+& \cellcolor{green!25}34
+& \cellcolor{blue!25}108
+& \cellcolor{purple!25}170
+& & & \\
+\hline
+50{,}000
+& \cellcolor{blue!25}56
+& \cellcolor{purple!25}171
+& & & & \\
+\hline
+100{,}000
+& \cellcolor{purple!25}99
+& & & & & \\
+\hline
+\end{tabular}
+
+\caption{Memory usage (in MB) of QVCache with varying
+$n_{\text{mini-index}}$ and $c_{\text{mini-index}}$ (in vectors).}
+\label{tab:memory-footprint-experiment}
+\end{table}
+
+\subsection{Memory Overhead Analysis of QVCache}
+
+QVCache maintains only the hottest vectors in its cache and evicts entries once the allocated capacity is reached, ensuring memory usage never exceeds the configured limit. To quantify this, we replicate the experiment from Section 6.2 under varying cache capacities by adjusting $n_{mini-index}$ and $c_{mini-index}$, as summarized in Table \ref{tab:memory-footprint-experiment}.
+
+For a billion-scale dataset such as SIFT, DiskANN requires 33.5 GB of memory. Adding QVCache with a capacity of 100,000 vectors incurs only 100–200 MB of overhead. Memory usage grows linearly with total capacity, and partitioning across multiple mini-indexes further increases overhead, as shown by the diagonals in Table \ref{tab:memory-footprint-experiment}.
+
+For workloads with working sets around 100,000 vectors, the overhead remains around 200 MB, suitable for client-side caching. When embedding QVCache directly into backend systems, extreme cases with working sets up to 1 million vectors result in roughly 2 GB of overhead. Considering that disk-based systems require tens of gigabytes and in-memory systems require hundreds of gigabytes, this overhead is negligible compared to the latency and throughput improvements enabled by QVCache.
+
+
+\begin{figure*}[t]
+\centering
+
+% Adjusted column width for 5 columns (roughly 1/5 of text width)
+\setlength{\colwidth}{0.18\textwidth}
+
+% ===== Row 1: hit_ratio =====
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/backend_experiments/faiss/hit_ratio.pdf}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/backend_experiments/qdrant/hit_ratio.pdf}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/backend_experiments/pgvector/hit_ratio.pdf}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/backend_experiments/pinecone/hit_ratio.pdf}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/backend_experiments/sptag/hit_ratio.pdf}
+\end{subfigure}
+
+% ===== Row 2: avg_hit_latency =====
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/backend_experiments/faiss/avg_hit_latency.pdf}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/backend_experiments/qdrant/avg_hit_latency.pdf}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/backend_experiments/pgvector/avg_hit_latency.pdf}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/backend_experiments/pinecone/avg_hit_latency.pdf}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/backend_experiments/sptag/avg_hit_latency.pdf}
+\end{subfigure}
+
+% ===== Row 3: p50_latency =====
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/backend_experiments/faiss/p50_latency.pdf}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/backend_experiments/qdrant/p50_latency.pdf}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/backend_experiments/pgvector/p50_latency.pdf}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/backend_experiments/pinecone/p50_latency.pdf}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/backend_experiments/sptag/p50_latency.pdf}
+\end{subfigure}
+
+% ===== Row 4: qps =====
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/backend_experiments/faiss/qps.pdf}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/backend_experiments/qdrant/qps.pdf}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/backend_experiments/pgvector/qps.pdf}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/backend_experiments/pinecone/qps.pdf}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/backend_experiments/sptag/qps.pdf}
+\end{subfigure}
+
+% ===== Row 5: recall =====
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/backend_experiments/faiss/recall.pdf}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/backend_experiments/qdrant/recall.pdf}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/backend_experiments/pgvector/recall.pdf}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/backend_experiments/pinecone/recall.pdf}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/backend_experiments/sptag/recall.pdf}
+\end{subfigure}
+
+% ===== Row 6: memory_active_vectors =====
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/backend_experiments/faiss/memory_active_vectors.pdf}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/backend_experiments/qdrant/memory_active_vectors.pdf}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/backend_experiments/pgvector/memory_active_vectors.pdf}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/backend_experiments/pinecone/memory_active_vectors.pdf}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/backend_experiments/sptag/memory_active_vectors.pdf}
+\end{subfigure}
+
+% ===== Row 7: Column captions =====
+\begin{subfigure}{\colwidth}
+    \centering
+    \vspace{0.5em}
+    \hspace{2em}(a) \textbf{FAISS}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \centering
+    \vspace{0.5em}
+    \hspace{2em}(b) \textbf{Qdrant}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \centering
+    \vspace{0.5em}
+    \hspace{2em}(c) \textbf{pgvector}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \centering
+    \vspace{0.5em}
+    \hspace{2em}(d) \textbf{Pinecone}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \centering
+    \vspace{0.5em}
+    \hspace{2em}(e) \textbf{SPANN}
+\end{subfigure}
+
+\caption{Performance of Various Backend Databases With and Without QVCache on DEEP Dataset}
+\label{fig:backend-experiments}
+\end{figure*}
+
+\subsection{Backend-Agnostic Caching}
+
+QVCache is compatible with any vector search system, independent of the underlying index type, system scale, or deployment environment, requiring only the implementation of standard search and fetch interfaces. To illustrate this property, we conduct the experiments shown in Figure \ref{fig:backend-experiments}, using the same parameter settings as in Section 6.2 for the DEEP dataset. All backends are evaluated both with and without QVCache. FAISS, Qdrant, and pgvector are deployed on the Linux host described in Section 6.2, while Pinecone is evaluated using its managed cloud service.
+
+Pinecone \cite{pinecone}, a cloud-managed vector search service, exhibits relatively high latencies ($\approx$ 100 ms) due to network round-trip overheads. As shown in Figure \ref{fig:backend-experiments}, integrating QVCache on the client side bypasses this network latency and reduces p50 latency by up to three orders of magnitude ($\approx$ 1000×). Although cache-miss fetches may incur additional time, we observe no degradation in recall or hit-rate convergence. Beyond latency reduction, QVCache also lowers serving costs for services billed on a per-query basis by converting a large fraction of requests into local, non-billable cache hits.
+
+For hybrid memory–disk backends, such as Qdrant \cite{qdrant2025} and SPANN \cite{spann}, and disk-only backends like pgvector \cite{pgvector}, QVCache provides substantial latency improvements by fronting their client libraries. Specifically, we observe up to 100×, 300×, and 500× reductions in p50 latency for Qdrant, SPANN, and pgvector, respectively. While our experiments use client-side integration, embedding QVCache directly within these systems would enable cross-client caching, exploiting a global view of incoming queries and allowing multiple clients’ requests to be served more efficiently through better aggregation.
+
+Even for fully in-memory backends such as FAISS, QVCache achieves up to 40× latency reduction. Here, both the backend and QVCache maintain indexes and vectors in memory, yet cache hits are faster because QVCache constrains the search space, allowing best-first search to converge in fewer steps. Nonetheless, QVCache introduces an in-cache probe for every request; when backend latency is already low and cache hit rates are limited, this overhead can be non-negligible.
