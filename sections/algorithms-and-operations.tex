@@ -145,3 +145,32 @@ FreshVamana handles deletions in two stages. When a node is marked for deletion,
 Mini-indexes are the unit of eviction in QVCache. This enables to avoid costly consolidation operation in FreshVamana \cite{freshdiskann} with the cost of coarser-grained information loss while evicting depending the on the capacity of mini-indexes. When all the mini-indexes get full, it evicts one of them accroding to eviction policy, e.g. Mini-index 3 in Figure~\ref{fig:architecture}, and upgraded to the hottest index for the future insertions to be used. 
 
 As discussed in Section 6.4, the capacity of each mini-index plays a critical role in performance. If a mini-index is too small, it triggers frequent evictions and fails to exploit the logarithmic convergence properties of FreshVamana~\cite{freshdiskann}. Conversely, overly large mini-indexes increase both query latency and eviction cost. Ideally, the capacity of each mini-index should approximately match the \textit{working set} size~\cite{working-set}, representing the subset of vectors that are fetched within a reasonably short time window. When allocating additional memory to QVCache, the overall cache size should be scaled by increasing ${\text{n}}_{\text{mini-index}}$ while keeping ${\text{c}}_{\text{mini-index}}$ constant (assuming the working set size remains constant), thereby maintaining stable and efficient latency characteristics.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\linewidth]{plots/noise_ratio_analysis/neighbor_overlap_analysis.pdf}
+    \caption{\textbf{Neighbor overlap under perturbation (GIST, $k=10$).} The intersection between the neighbor sets of the base and perturbed queries decays sharply, approaching near-zero at a noise ratio of 0.5.}
+    \label{fig:overlap-analysis}
+\end{figure}
+
+
+\begin{figure*}[h]
+    \centering
+    \begin{subfigure}[t]{0.48\textwidth}
+        \centering
+        \input{figures/query_perturbation}
+        \caption{Synthesizing Queries with Semantic (Spatial) Locality}
+        \label{fig:query-perturbation}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[t]{0.48\textwidth}
+        \centering
+        \resizebox{0.8\textwidth}{!}{
+            \input{figures/sliding_window_experiment}
+        }
+        \caption{Workload Generation with temporal-semantic Locality}
+        \label{fig:sliding-window}
+    \end{subfigure}
+    \caption{Evaluation framework proposed in this paper for benchmarking vector caches, used to evaluate QVCache.}
+    \label{fig:evaluation-framework}
+\end{figure*}
