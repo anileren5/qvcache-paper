@@ -3,7 +3,7 @@
 \small
 \begin{tabular}{lrrrr}
 \toprule
-\textbf{Dataset} & \textbf{\#Vectors} & \textbf{Dim.} & \textbf{Metric} & \textbf{\#Queries} \\
+\textbf{Dataset} & \textbf{\#Vectors} & \textbf{Dim.} & \textbf{Distance} & \textbf{\#Queries} \\
 \midrule
 SIFT        & 1{,}000{,}000{,}000 & 128 & L2     & 10{,}000 \\
 SpaceV\footnotemark[1] & 100{,}000{,}000     & 100 & L2     & 29{,}316 \\
@@ -16,7 +16,7 @@ GloVe       & 1{,}000{,}000       & 100 & Cosine & 10{,}000 \\
 \label{tab:datasets}
 \end{table}
 
-\footnotetext[1]{For \textsc{SpaceV} and \textsc{DEEP}, we use the first 100M and 10M vectors of the respective datasets.}
+\footnotetext[1]{For \textsc{SpaceV} and \textsc{DEEP}, we use the first 100M and 10M vectors of the 1B vectors in respective datasets.}
 
 \section{Experiments}
 
@@ -25,10 +25,12 @@ We implement QVCache in C++, together with Python bindings. All experiments are 
 
 \textbf{Datasets.} We evaluate how well QVCache generalizes across diverse data by benchmarking it on five datasets that differ in scale, domain, and dimensionality, as summarized in Table~\ref{tab:datasets} \cite{sift, deep, gist, pennington-etal-2014-glove, SPACEV1B_SPTAG}. 
 
-\textbf{Backends.} We evaluate QVCache across a range of backend databases to understand its performance under diverse scenarios. We employ the DiskANN implementation by Yu et al. (2025) \cite{yu2025topologyawarelocalizedupdatestrategy} thanks to its convenience for benchmarking QVCache across multiple datasets. Additionally, we test QVCache with FAISS \cite{faiss} (an in-memory store, on CPU), pgvector \cite{pgvector} (a disk-based database), Qdrant \cite{qdrant2025} (a hybrid setup), Pinecone \cite{pinecone} (a managed cloud service) and SPANN \cite{spann} (a tree-navigated centroid graph) to assess its effectiveness with backends having different characteristics.
+\textbf{Backends.} We evaluate QVCache across a range of backend databases to understand its performance under diverse scenarios. We employ the DiskANN \cite{diskann} implementation by Yu et al. (2025) \cite{yu2025topologyawarelocalizedupdatestrategy}, a state-of-the-art disk-based vector search framework, for benchmarking QVCache across multiple datasets. Additionally, we test QVCache with FAISS \cite{faiss}, pgvector \cite{pgvector}, Qdrant \cite{qdrant2025}, Pinecone \cite{pinecone}, and SPANN \cite{spann} to assess its effectiveness with backends that differ in storage model (in-memory, disk-based, or hybrid), deployment model (on-premises vs. cloud-based), and index type (graph, tree, etc.).
 
-\textbf{Metrics.} We evaluate QVCache using six metrics, as illustrated in Figures \ref{fig:dataset-experiments} and \ref{fig:backend-experiments}. Metrics are collected at the granularity of window steps, with each dot representing a step. The \emph{cache hit ratio} measures the fraction of queries served by QVCache without forwarding requests to the backend database, while \emph{hit latency} captures the latency of these queries. We intentionally omit P99 latency because, unless QVCache achieves a hit ratio above 99\%, P99 is dominated by queries that miss the cache and are served by the backend, yielding no meaningful distinction between configurations. Instead, we use P50 latency to evaluate overall latency performance, independent of cache hits or misses.
-Although QVCache is primarily designed for low-latency responses, it also improves throughput; we report metrics reflecting this benefit. To measure query accuracy, we use k-recall@k (with k = 10). We also track the number of vectors retrieved from the backend into the cache over time to assess eviction behavior. 
+\textbf{Metrics.} %We evaluate QVCache using six metrics, as illustrated in Figures \ref{fig:dataset-experiments} and \ref{fig:backend-experiments}. Metrics are collected at the granularity of window steps, with each dot representing a step. 
+We evaluate QVCache using six metrics per window.
+\emph{Cache hit ratio} measures the fraction of queries served by QVCache without forwarding requests to the backend database, while \emph{Hit latency} captures the latency of these queries. We use P50 latency and omit P99 latency because, unless QVCache achieves a hit ratio above 99\%, P99 is dominated by queries that miss the cache and are served by the backend, yielding no meaningful distinction when using QVCache. %Instead, we use P50 latency to evaluate overall latency performance. %, independent of cache hits or misses.
+Although QVCache is primarily designed for low-latency responses, it also improves throughput; we report the metric reflecting this benefit. To measure query accuracy, we use 10-recall@10. We also track the number of vectors retrieved from the backend into the cache over time to assess eviction behavior. 
 
 \begin{figure*}[t]
 \centering
@@ -171,16 +173,17 @@ Although QVCache is primarily designed for low-latency responses, it also improv
     (e) \textbf{GloVe}
 \end{subfigure}
 
-\caption{Backend (DiskANN) alone versus DiskANN augmented with QVCache across six metrics and five datasets.}
+\caption{Vector search performance of backend vector database (DiskANN) alone vs. backend augmented with QVCache on the five datasets. $k$ is set to 10.}
 
 \label{fig:dataset-experiments}
 \end{figure*}
 
 \subsection{Adaptive Query-Aware Caching}
 
-A query-aware vector cache must adopt to non-stationary workloads, where the active working set drifts \cite{10.14778/2735461.2735465inmemoryperformanceforbigdata} over time, across diverse datasets. It should support varying dimensionalities, distance functions, and $k$ values while requiring minimal configuration.
+A query-aware vector cache must adopt to non-stationary workloads, where the active working set drifts \cite{10.14778/2735461.2735465inmemoryperformanceforbigdata} over time. It should support varying dimensionalities, distance functions, and $k$ values while requiring minimal configuration (i.e., without manually tuning similarity thresholds), regardless of the underlying dataset.
 
-To evaluate these properties, we conduct experiments on five datasets, as shown in Figures \ref{fig:dataset-experiments} and \ref{fig:k-experiments}. Workloads are generated with $N_{\text{split}} = 10$, $\eta = 0.01$, $N_{\text{repeat}} = 3$, and $stride = 1$. QVCache is configured with $\alpha = 0.9$, $n_{\text{buckets}} = 8$, $d_{\text{reduced}} = 16$, and $n_{\text{mini-index}} = 4$. The value of $D$ is set to 0.25 for SIFT, 0.001 for GloVe, and 0.075 for the remaining datasets. The capacity of each mini-index, $c_{\text{mini-index}}$, is set per dataset to approximate the working set size, defined as the number of unique vectors appearing in query neighbor sets within a window. Hence, this determines the number of vectors to be retrieved by QVCache. 
+%To evaluate these properties, we conduct experiments on five datasets, as shown in 
+Figures \ref{fig:dataset-experiments} and \ref{fig:k-experiments} show the results. Workloads are generated with $N_{\text{split}} = 10$, $\eta = 0.01$, $N_{\text{repeat}} = 3$, and $stride = 1$. QVCache is configured with $\alpha = 0.9$, $n_{\text{buckets}} = 8$, $d_{\text{reduced}} = 16$, and $n_{\text{mini-index}} = 4$. The value of $D$ is set to 0.25 for SIFT, 0.001 for GloVe, and 0.075 for the remaining datasets. The capacity of each mini-index, $c_{\text{mini-index}}$, is set per dataset to approximate the working set size, defined as the number of unique vectors appearing in query neighbor sets within a window. Hence, this determines the number of vectors to be retrieved by QVCache. 
 
 Queries are processed by $t_{processing} = 24$ worker threads, while asynchronous tasks, including vector insertions and threshold learning, are handled by a separate pool of $t_{processing} = 16$ threads.
 
@@ -218,7 +221,7 @@ Finally, as shown in Figure \ref{fig:k-experiments}, QVCache adapts to queries w
         \includegraphics[width=\linewidth]{plots/k_experiments/all_comparison/p50_latency.pdf}
     \end{subfigure}
 
-    \caption{Impact of varying $k$ on QVCache on SIFT dataset.}
+    \caption{Effect of varying $k$ on SIFT dataset.}
     \label{fig:k-experiments}
 \end{figure}
 
@@ -276,7 +279,7 @@ On the right, we fix the total cache capacity at 60,000 and vary $c_{\text{mini-
 \end{subfigure}
 
 \caption{
-Effect of cache capacity and partitioning on QVCache on the SIFT dataset.
+Effect of cache capacity and size of mini-indexes in QVCache on the SIFT dataset.
 Left: varying total cache capacity via $n_{\text{mini-index}}$.
 Right: varying $c_{\text{mini-index}}$ with fixed total capacity.}
 \label{fig:cache_size_experiments}
@@ -292,7 +295,7 @@ Right: varying $c_{\text{mini-index}}$ with fixed total capacity.}
         \label{fig:plot1}
     \end{subfigure}
 
-    \caption{Impact of mini-index granularity on QVCache performance. The total cache capacity is fixed at 50{,}000 vectors, while the number of mini-indexes is varied to control per–mini-index capacity.
+    \caption{Effect of mini-index granularity on QVCache performance. The total cache capacity is fixed at 50{,}000 vectors, while the number of mini-indexes is varied to control per–mini-index capacity.
 }
     \label{fig:granularity-effect}
 \end{figure}
@@ -388,7 +391,7 @@ To evaluate this effect, we repeated the experiment from Section 5.2 on the SIFT
         \subcaption{$n_{\text{buckets}}$ — Recall}
     \end{minipage}
 
-    \caption{Impact of granularity of space partitioning and dimensionality reduction on recall and hit ratio. Left: varying $d_{\text{reduced}}$ (fixed $n_{\text{buckets}}$). Right: varying $n_{\text{buckets}}$ (fixed $d_{\text{reduced}}$).}
+    \caption{Impact of granularity of space partitioning and dimensionality reduction on recall and hit ratio. Left: varying $d_{\text{reduced}}$ (fixed $n_{\text{buckets}}$ to 8). Right: varying $n_{\text{buckets}}$ (fixed $d_{\text{reduced}}$ to 16).}
 
     \label{fig:pca_experiments}
 \end{figure}
@@ -396,11 +399,11 @@ To evaluate this effect, we repeated the experiment from Section 5.2 on the SIFT
 
 \subsection{Sensitivity Analysis: Space Partitioning and Dimensionality Reduction}
 
-We evaluate QVCache’s sensitivity to the granularity of space partitioning ($n_{buckets}$) and dimensionality reduction ($d_{reduced}$) by repeating the experiment from Figure \ref{fig:dataset-experiments} on the GIST dataset with $WINDOW\_SIZE = 1$ and $stride = 1$. As shown in Figure \ref{fig:pca_experiments}, the left column fixes $d_{reduced}$ at 16 and varies $n_{buckets}$, while the right column fixes $n_{buckets}$ at 8 and varies $d_{reduced}$, reporting the resulting hit ratio and recall.
+We evaluate QVCache’s sensitivity to the granularity of space partitioning ($n_{buckets}$) and dimensionality reduction ($d_{reduced}$) by repeating the experiment from Figure \ref{fig:dataset-experiments} on the GIST dataset with $WINDOW\_SIZE = 1$ and $stride = 1$. As shown in Figure \ref{fig:pca_experiments}, the left column fixes $n_{buckets}$ at 8 and varies $d_{reduced}$, while the right column fixes $d_{reduced}$ at 16 and varies $n_{buckets}$, reporting the resulting hit ratio and recall.
 
 GIST vectors have 960 dimensions. Increasing $d_{reduced}$ to 128 or higher provides only a modest improvement in recall (around 3–4\%) while significantly reducing the hit ratio, highlighting the effectiveness of dimensionality reduction for guiding cache hit–miss decisions.
 
-Similarly, increasing $n_{buckets}$ from 8 to 128 yields an average recall improvement of roughly 5\% but heavily reduces the hit ratio. This behavior arises because \ref{alg:learn-threshold} overfits local patterns and fails to generalize across queries.
+Similarly, increasing $n_{buckets}$ from 8 to 128 yields an average recall improvement of roughly 5\% but heavily reduces the hit ratio. This behavior arises because Algorithm \ref{alg:learn-threshold} overfits local patterns (i.e. the partitioning is so fine-grained that $\theta[k][R]$ learns almost a query-specific estimate of $\text{d}{_\text{backend}}[k]$ in each region) and fails to generalize across queries.
 
 
 \begin{table}[h]
@@ -469,6 +472,7 @@ For a billion-scale dataset such as SIFT, DiskANN requires 33.5 GB of memory. Ad
 
 For workloads with working sets around 100,000 vectors, the overhead remains around 200 MB, suitable for client-side caching. When embedding QVCache directly into backend systems, extreme cases with working sets up to 1 million vectors result in roughly 2 GB of overhead. Considering that disk-based systems require tens of gigabytes and in-memory systems require hundreds of gigabytes, this overhead is negligible compared to the latency and throughput improvements enabled by QVCache.
 
+Moreover, the memory required to store distance thresholds is negligible and is included in the numbers reported in Table \ref{tab:memory-footprint-experiment}. For example, QVCache learns roughly 1.5K, 15K, and 50K thresholds for GIST, SIFT, and SpaceV in Figure \ref{fig:dataset-experiments}, consuming about 200 KB for SpaceV. Even under pessimistic assumptions where, e.g., one million thresholds are learned due to highly diverse queries or varying values of $k$, the footprint remains around 4 MB. Users may optionally cap the number of stored thresholds, evicting and relearning them if needed. Overall, threshold storage contributes insignificantly to QVCache’s memory use.
 
 \begin{figure*}[t]
 \centering

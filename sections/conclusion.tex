@@ -1,2 +1,5 @@
 \section{Conclusion}
 We introduced QVCache, a query-aware, backend-agnostic vector cache that delivers sub-millisecond similarity search on cache hits for datasets of any scale, using only a memory footprint on the order of megabytes. By dynamically learning region- and $k$-specific distance thresholds and organizing cached vectors into bounded mini-indexes, QVCache achieves up to 300$\times$ lower query latency and 40$\times$ higher throughput compared to disk-based backends, while maintaining a controllable recall loss of 2--10\%. Across diverse datasets and vector databases, QVCache consistently transforms a large fraction of queries into local cache hits, demonstrating that adaptive similarity caching is a practical and effective optimization layer for large-scale vector search systems under workloads exhibiting temporal-semantic locality.
+
+
+
