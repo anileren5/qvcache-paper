@@ -179,11 +179,12 @@ Although QVCache is primarily designed for low-latency responses, it also improv
 \end{figure*}
 
 \subsection{Adaptive Query-Aware Caching}
+\label{sec:dataset-experiments}
 
 A query-aware vector cache must adopt to non-stationary workloads, where the active working set drifts \cite{10.14778/2735461.2735465inmemoryperformanceforbigdata} over time. It should support varying dimensionalities, distance functions, and $k$ values while requiring minimal configuration (i.e., without manually tuning similarity thresholds), regardless of the underlying dataset.
 
 %To evaluate these properties, we conduct experiments on five datasets, as shown in 
-Figures \ref{fig:dataset-experiments} and \ref{fig:k-experiments} show the results. Workloads are generated with $N_{\text{split}} = 10$, $\eta = 0.01$, $N_{\text{repeat}} = 3$, and $stride = 1$. QVCache is configured with $\alpha = 0.9$, $n_{\text{buckets}} = 8$, $d_{\text{reduced}} = 16$, and $n_{\text{mini-index}} = 4$. The value of $D$ is set to 0.25 for SIFT, 0.001 for GloVe, and 0.075 for the remaining datasets. The capacity of each mini-index, $c_{\text{mini-index}}$, is set per dataset to approximate the working set size, defined as the number of unique vectors appearing in query neighbor sets within a window. Hence, this determines the number of vectors to be retrieved by QVCache. 
+Figures \ref{fig:dataset-experiments} and \ref{fig:k-experiments} show the results. Workloads are generated with $N_{\text{split}} = 10$, $\eta = 0.01$, $N_{\text{repeat}} = 3$, and $stride = 1$. QVCache is configured with $\alpha = 0.9$, $n_{\text{buckets}} = 8$, $d_{\text{reduced}} = 16$, and $n_{\text{mini-index}} = 4$. The value of $D$ is set to 0.25 for SIFT, 0.001 for GloVe, and 0.075 for the remaining datasets. \texttt{ADAPTIVE} search strategy is used to scan mini-indexes.  The capacity of each mini-index, $c_{\text{mini-index}}$, is set per dataset to approximate the working set size, defined as the number of unique vectors appearing in query neighbor sets within a window. Hence, this determines the number of vectors to be retrieved by QVCache. 
 
 Queries are processed by $t_{processing} = 24$ worker threads, while asynchronous tasks, including vector insertions and threshold learning, are handled by a separate pool of $t_{processing} = 16$ threads.
 
@@ -328,7 +329,7 @@ Based on our experimental results, QVCache capacity should not be scaled vertica
         \includegraphics[width=\linewidth]{plots/deviation_factor_experiments/recall.pdf}
     \end{subfigure}
 
-    \caption{Deviation Factor Effect on Recall and Hit Ratio}
+    \caption{Deviation Factor Effect on Hit Ratio - Recall on SIFT}
     \label{fig:deviation-factor-experiment}
 \end{figure}
 
@@ -356,8 +357,7 @@ There is no universal rule for selecting an appropriate deviation factor, as it 
 
 
 \subsection{Spatial Thresholds Are Key to Correct Cache Hit/Miss Decisions}
-
-As illustrated in Figure \ref{fig:spatial-thresholds}, vector distributions vary significantly across the vector space: some regions are densely clustered, while others are sparse. This heterogeneity makes it impractical to rely on a single global similarity threshold for all cache hit decisions.
+Vector distributions vary significantly across the vector space: some regions are densely clustered, while others are sparse. This heterogeneity makes it impractical to rely on a single global similarity threshold for all cache hit decisions.
 
 To evaluate this effect, we repeated the experiment from Section 5.2 on the SIFT dataset under two configurations: one using a single global threshold and the other using spatial thresholds. As shown in Figure~\ref{fig:spatial-threshold-experiment}, the global threshold aggregates updates from cache misses across all regions, failing to capture local patterns and causing up to a 15\% loss in recall due to incorrect hit/miss decisions. In contrast, spatial thresholds adapt to local variations in the query distribution, limiting recall degradation to at most 2–3\%, demonstrating their effectiveness in preserving the backend database’s accuracy.
 
@@ -404,7 +404,6 @@ We evaluate QVCache’s sensitivity to the granularity of space partitioning ($n
 GIST vectors have 960 dimensions. Increasing $d_{reduced}$ to 128 or higher provides only a modest improvement in recall (around 3–4\%) while significantly reducing the hit ratio, highlighting the effectiveness of dimensionality reduction for guiding cache hit–miss decisions.
 
 Similarly, increasing $n_{buckets}$ from 8 to 128 yields an average recall improvement of roughly 5\% but heavily reduces the hit ratio. This behavior arises because Algorithm \ref{alg:learn-threshold} overfits local patterns (i.e. the partitioning is so fine-grained that $\theta[k][R]$ learns almost a query-specific estimate of $\text{d}{_\text{backend}}[k]$ in each region) and fails to generalize across queries.
-
 
 \begin{table}[h]
 \centering
@@ -460,7 +459,7 @@ Similarly, increasing $n_{buckets}$ from 8 to 128 yields an average recall impro
 \end{tabular}
 
 \caption{Memory usage (in MB) of QVCache with varying
-$n_{\text{mini-index}}$ and $c_{\text{mini-index}}$ (in vectors).}
+$n_{\text{mini-index}}$ and $c_{\text{mini-index}}$ (in vectors) on SIFT.}
 \label{tab:memory-footprint-experiment}
 \end{table}
 
@@ -473,6 +472,45 @@ For a billion-scale dataset such as SIFT, DiskANN requires 33.5 GB of memory. Ad
 For workloads with working sets around 100,000 vectors, the overhead remains around 200 MB, suitable for client-side caching. When embedding QVCache directly into backend systems, extreme cases with working sets up to 1 million vectors result in roughly 2 GB of overhead. Considering that disk-based systems require tens of gigabytes and in-memory systems require hundreds of gigabytes, this overhead is negligible compared to the latency and throughput improvements enabled by QVCache.
 
 Moreover, the memory required to store distance thresholds is negligible and is included in the numbers reported in Table \ref{tab:memory-footprint-experiment}. For example, QVCache learns roughly 1.5K, 15K, and 50K thresholds for GIST, SIFT, and SpaceV in Figure \ref{fig:dataset-experiments}, consuming about 200 KB for SpaceV. Even under pessimistic assumptions where, e.g., one million thresholds are learned due to highly diverse queries or varying values of $k$, the footprint remains around 4 MB. Users may optionally cap the number of stored thresholds, evicting and relearning them if needed. Overall, threshold storage contributes insignificantly to QVCache’s memory use.
+
+\begin{figure}[h]
+    \centering
+
+    % Top row
+    \begin{subfigure}[t]{0.48\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{plots/noise_ratio_experiments/hit_ratio.pdf}
+    \end{subfigure}\hfill
+    \begin{subfigure}[t]{0.48\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{plots/noise_ratio_experiments/recall.pdf}
+    \end{subfigure}
+
+    \vspace{0.75em}
+
+    % Bottom row
+    \begin{subfigure}[t]{0.48\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{plots/noise_ratio_experiments/p50_latency.pdf}
+    \end{subfigure}
+    \begin{subfigure}[t]{0.48\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{plots/noise_ratio_experiments/memory_active_vectors.pdf}
+    \end{subfigure}
+
+    \caption{Effect of increasing noise ratio, $\eta$, on DEEP dataset.}
+    \label{fig:noise-ratio-experiments}
+\end{figure}
+
+\subsection{Stress-Testing QVCache in the Absence of Temporal–Semantic Locality}
+
+In Figure~\ref{fig:noise-ratio-experiments}, we evaluate how the noise ratio $\eta$ affects QVCache by repeating the experiment from Section~\ref{sec:dataset-experiments} while increasing $\eta$ up to~0.6. To avoid triggering evictions and simply observe how many vectors QVCache retrieves into the cache, we set the cache capacity to 1M vectors. As shown in Figure~\ref{fig:overlap-analysis}, $\eta = 0.6$ represents the extreme case in which perturbed queries share no overlap in their top-$k$ neighbors, i.e., every query effectively becomes unique. Even under this setting, QVCache sustains high hit ratios while degrading recall by less than~4\%.
+
+This result reveals an important phenomenon: pairwise uniqueness among queries does not imply global dissimilarity across a workload. Although no two perturbed queries share top-$k$ neighbors, the collective set of vectors they reference still exhibits overlap at scale. This is reflected in the curves for $\eta = 0.4$ and $\eta = 0.6$, where the number of vectors inserted into the cache increases only modestly. Thus, QVCache may remain effective even when similar queries do not repeat, leveraging potential collaboration across many unique queries rather than relying solely on strict temporal-semantic locality.
+
+
+
+
 
 \begin{figure*}[t]
 \centering
@@ -532,21 +570,21 @@ Moreover, the memory required to store distance thresholds is negligible and is 
 \end{subfigure}
 
 % ===== Row 4: qps =====
-\begin{subfigure}{\colwidth}
-    \includegraphics[width=\linewidth]{plots/backend_experiments/faiss/qps.pdf}
-\end{subfigure}
-\begin{subfigure}{\colwidth}
-    \includegraphics[width=\linewidth]{plots/backend_experiments/qdrant/qps.pdf}
-\end{subfigure}
-\begin{subfigure}{\colwidth}
-    \includegraphics[width=\linewidth]{plots/backend_experiments/pgvector/qps.pdf}
-\end{subfigure}
-\begin{subfigure}{\colwidth}
-    \includegraphics[width=\linewidth]{plots/backend_experiments/pinecone/qps.pdf}
-\end{subfigure}
-\begin{subfigure}{\colwidth}
-    \includegraphics[width=\linewidth]{plots/backend_experiments/sptag/qps.pdf}
-\end{subfigure}
+%\begin{subfigure}{\colwidth}
+%    \includegraphics[width=\linewidth]{plots/backend_experiments/faiss/qps.pdf}
+%\end{subfigure}
+%\begin{subfigure}{\colwidth}
+%    \includegraphics[width=\linewidth]{plots/backend_experiments/qdrant/qps.pdf}
+%\end{subfigure}
+%\begin{subfigure}{\colwidth}
+%    \includegraphics[width=\linewidth]{plots/backend_experiments/pgvector/qps.pdf}
+%\end{subfigure}
+%\begin{subfigure}{\colwidth}
+%    \includegraphics[width=\linewidth]{plots/backend_experiments/pinecone/qps.pdf}
+%\end{subfigure}
+%\begin{subfigure}{\colwidth}
+%    \includegraphics[width=\linewidth]{plots/backend_experiments/sptag/qps.pdf}
+%\end{subfigure}
 
 % ===== Row 5: recall =====
 \begin{subfigure}{\colwidth}
