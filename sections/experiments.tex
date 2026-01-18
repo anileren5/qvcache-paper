@@ -32,13 +32,42 @@ We evaluate QVCache across six metrics measured per window, with values reported
 \emph{Cache hit ratio} measures the fraction of queries served by QVCache without forwarding requests to the backend database, while \emph{Hit latency} captures the latency of these queries. We use P50 latency and omit P99 latency because, unless QVCache achieves a hit ratio above 99\%, P99 is dominated by queries that miss the cache and are served by the backend, yielding no meaningful distinction when using QVCache. %Instead, we use P50 latency to evaluate overall latency performance. %, independent of cache hits or misses.
 Although QVCache is primarily designed for low-latency responses, it also improves throughput; we report the metric reflecting this benefit. To measure query accuracy, we use 10-recall@10. We also track the number of vectors retrieved from the backend into the cache over time to assess eviction behavior. 
 
+\begin{figure}[h]
+    \centering
+
+    % Top row
+    \begin{subfigure}[t]{0.48\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{plots/k_experiments/all_comparison/hit_ratio.pdf}
+    \end{subfigure}\hfill
+    \begin{subfigure}[t]{0.48\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{plots/k_experiments/all_comparison/memory_active_vectors.pdf}
+    \end{subfigure}
+
+    \vspace{0.75em}
+
+    % Bottom row
+    \begin{subfigure}[t]{0.48\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{plots/k_experiments/all_comparison/recall.pdf}
+    \end{subfigure}
+    \begin{subfigure}[t]{0.48\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{plots/k_experiments/all_comparison/p50_latency.pdf}
+    \end{subfigure}
+
+    \caption{Effect of varying $k$ on SIFT dataset.}
+    \label{fig:k-experiments}
+\end{figure}
+
+
+
 \begin{figure*}[t]
 \centering
 % Define the column width for 5 columns (Using 0.195\textwidth for slight height increase)
 \newlength{\colwidth}
 \setlength{\colwidth}{0.195\textwidth}
-
-% Column Order: sift, spacev100m, deep10m, text2image, glove
 
 % ===== Row 1: hit_ratio =====
 \begin{subfigure}{\colwidth}
@@ -184,7 +213,7 @@ Although QVCache is primarily designed for low-latency responses, it also improv
 A query-aware vector cache must adopt to non-stationary workloads, where the active working set drifts \cite{10.14778/2735461.2735465inmemoryperformanceforbigdata} over time. It should support varying dimensionalities, distance functions, and $k$ values while requiring minimal configuration (i.e., without manually tuning similarity thresholds), regardless of the underlying dataset.
 
 %To evaluate these properties, we conduct experiments on five datasets, as shown in 
-Figures \ref{fig:dataset-experiments} and \ref{fig:k-experiments} show the results. Workloads are generated with $N_{\text{split}} = 10$, $\eta = 0.01$, $N_{\text{repeat}} = 3$, and $stride = 1$. QVCache is configured with $\alpha = 0.9$, $n_{\text{buckets}} = 8$, $d_{\text{reduced}} = 16$, and $n_{\text{mini-index}} = 4$. The value of $D$ is set to 0.25 for SIFT, 0.001 for GloVe, and 0.075 for the remaining datasets. \texttt{ADAPTIVE} search strategy is used to scan mini-indexes.  The capacity of each mini-index, $c_{\text{mini-index}}$, is set per dataset to approximate the working set size, defined as the number of unique vectors appearing in query neighbor sets within a window. Hence, this determines the number of vectors to be retrieved by QVCache. 
+Figures \ref{fig:k-experiments} and \ref{fig:dataset-experiments} show the results. Workloads are generated with $N_{\text{split}} = 10$, $\eta = 0.01$, $N_{\text{repeat}} = 3$, and $stride = 1$. QVCache is configured with $\alpha = 0.9$, $n_{\text{buckets}} = 8$, $d_{\text{reduced}} = 16$, and $n_{\text{mini-index}} = 4$. The value of $D$ is set to 0.25 for SIFT, 0.001 for GloVe, and 0.075 for the remaining datasets. \texttt{ADAPTIVE} search strategy is used to scan mini-indexes.  The capacity of each mini-index, $c_{\text{mini-index}}$, is set per dataset to approximate the working set size, defined as the number of unique vectors appearing in query neighbor sets within a window. Hence, this determines the number of vectors to be retrieved by QVCache. 
 
 Queries are processed by $t_{processing} = 24$ worker threads, while asynchronous tasks, including vector insertions and threshold learning, are handled by a separate pool of $t_{processing} = 16$ threads.
 
@@ -194,47 +223,91 @@ Recall is minimally affected. SIFT, SpaceV, and DEEP show approximately 2\% drop
 
 Cache hits achieve sub-millisecond latency on SIFT, SpaceV, and DEEP, approximately 0.2 to 0.4 milliseconds, with slightly higher latencies on other datasets, approximately 0.6 to 1.0 milliseconds. For GIST, the higher latency results from its 960-dimensional vectors, which increase computational cost. In GloVe, despite comparable mini-index capacity, hit latency is higher due to the sequential scanning strategy across all mini-indexes.
 
+\begin{figure*}[t]
+\centering
+
+% Adjusted column width for 5 columns (roughly 1/5 of text width)
+\setlength{\colwidth}{0.18\textwidth}
+
+% ===== Row 1: p50_latency =====
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/backend_experiments/faiss/p50_latency.pdf}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/backend_experiments/qdrant/p50_latency.pdf}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/backend_experiments/pgvector/p50_latency.pdf}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/backend_experiments/pinecone/p50_latency.pdf}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/backend_experiments/sptag/p50_latency.pdf}
+\end{subfigure}
+
+% ===== Row 2: recall =====
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/backend_experiments/faiss/recall.pdf}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/backend_experiments/qdrant/recall.pdf}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/backend_experiments/pgvector/recall.pdf}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/backend_experiments/pinecone/recall.pdf}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \includegraphics[width=\linewidth]{plots/backend_experiments/sptag/recall.pdf}
+\end{subfigure}
+
+% ===== Row 3: Column captions =====
+\begin{subfigure}{\colwidth}
+    \centering
+    \vspace{0.5em}
+    \hspace{2em}(a) \textbf{FAISS}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \centering
+    \vspace{0.5em}
+    \hspace{2em}(b) \textbf{Qdrant}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \centering
+    \vspace{0.5em}
+    \hspace{2em}(c) \textbf{pgvector}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \centering
+    \vspace{0.5em}
+    \hspace{2em}(d) \textbf{Pinecone}
+\end{subfigure}
+\begin{subfigure}{\colwidth}
+    \centering
+    \vspace{0.5em}
+    \hspace{2em}(e) \textbf{SPANN}
+\end{subfigure}
+
+\caption{Performance of Various Backend Databases With and Without QVCache on DEEP Dataset}
+\label{fig:backend-experiments}
+\end{figure*}
+
 Finally, as shown in Figure \ref{fig:k-experiments}, QVCache adapts to queries with varying $k$ values without any additional configuration beyond the total cache capacity. Capacities of 6,000, 60,000, and 600,000 vectors were allocated for $k = 1$, 10, and 100, respectively, reflecting the linear increase in vectors retrieved per window as $k$ grows. Overall, performance trends remain consistent across different $k$ values, with latency improvements becoming more pronounced for larger $k$.
 
 
-\begin{figure}[h]
-    \centering
+\subsection{Evaluating QVCache with Different Backends}
 
-    % Top row
-    \begin{subfigure}[t]{0.48\linewidth}
-        \centering
-        \includegraphics[width=\linewidth]{plots/k_experiments/all_comparison/hit_ratio.pdf}
-    \end{subfigure}\hfill
-    \begin{subfigure}[t]{0.48\linewidth}
-        \centering
-        \includegraphics[width=\linewidth]{plots/k_experiments/all_comparison/memory_active_vectors.pdf}
-    \end{subfigure}
+QVCache is compatible with any vector search system (i.e. backend-agnostic), independent of the underlying index type, system scale, or deployment environment, requiring only the implementation of standard search and fetch interfaces. To illustrate this property, we conduct the experiments shown in Figure \ref{fig:backend-experiments}, using the same parameter settings as in Section 6.2 for the DEEP dataset. All backends are evaluated both with and without QVCache. FAISS, Qdrant, and pgvector are deployed on the Linux host described in Section 6.2, while Pinecone is evaluated using its managed cloud service.
 
-    \vspace{0.75em}
+Pinecone \cite{pinecone}, a cloud-managed vector search service, exhibits relatively high latencies ($\approx$ 100 ms) due to network round-trip overheads. As shown in Figure \ref{fig:backend-experiments}, integrating QVCache on the client side bypasses this network latency and reduces p50 latency by up to three orders of magnitude ($\approx$ 1000×). Although cache-miss fetches may incur additional time, we observe no degradation in recall or hit-rate convergence. %Beyond latency reduction, QVCache also lowers serving costs for services billed on a per-query basis by converting a large fraction of requests into local, non-billable cache hits.
 
-    % Bottom row
-    \begin{subfigure}[t]{0.48\linewidth}
-        \centering
-        \includegraphics[width=\linewidth]{plots/k_experiments/all_comparison/recall.pdf}
-    \end{subfigure}
-    \begin{subfigure}[t]{0.48\linewidth}
-        \centering
-        \includegraphics[width=\linewidth]{plots/k_experiments/all_comparison/p50_latency.pdf}
-    \end{subfigure}
+For hybrid memory–disk backends, such as Qdrant \cite{qdrant2025} and SPANN \cite{spann}, and disk-only backends like pgvector \cite{pgvector}, QVCache provides substantial latency improvements by fronting their client libraries. Specifically, we observe up to $\approx$100×, $\approx$300×, and $\approx$500× reductions in p50 latency for Qdrant, SPANN, and pgvector, respectively. While our experiments use client-side integration, embedding QVCache directly within these systems would enable cross-client caching, exploiting a global view of incoming queries and allowing multiple clients’ requests to be served more efficiently through better aggregation.
 
-    \caption{Effect of varying $k$ on SIFT dataset.}
-    \label{fig:k-experiments}
-\end{figure}
+Even for fully in-memory backends such as FAISS, QVCache achieves up to 40× latency reduction. Here, both the backend and QVCache maintain indexes and vectors in memory, yet cache hits are faster because QVCache constrains the search space, allowing best-first search to converge in fewer steps. Nonetheless, QVCache introduces an in-cache probe for every request; when backend latency is already low and cache hit rates are limited, this overhead can be non-negligible.
 
-\subsection{Sensitivity to Cache Capacity and Mini Index Partitioning}
-
-As first noted by Belady \cite{belady1966study}, an ideal cache would retain exactly the items that will be accessed again and evict only those that will never be referenced in the future. Such optimal behavior is attainable only with an unbounded cache or an oracle that perfectly predicts future accesses. Since neither assumption is practical, real systems are inherently constrained by finite capacity and imperfect eviction decisions. The same limitations apply to QVCache.
-
-To assess how well QVCache maintains high hit ratios under fixed capacity, we repeat the experiment from Figure \ref{fig:dataset-experiments} on the SIFT dataset using identical parameters, except with $N_{\text{round}} = 2$, as shown in Figure \ref{fig:cache_size_experiments}. Perturbed copies of a base split within a window bring approximately 15,000 vectors into the cache. With a window size of 4, the working set therefore contains roughly 60,000 vectors. Since the stride is 1, the working set changes by about 25\% at each window slide. An ideal configuration for this workload would thus set $c_{\text{mini-index}} = 15{,}000$ and a total cache capacity of at least 60,000 vectors.
-
-In practice, however, estimating working set sizes and shift rates can be difficult. We therefore examine QVCache’s sensitivity to total cache capacity and $c_{\text{mini-index}}$ in Figure \ref{fig:cache_size_experiments}. On the left, we fix $c_{\text{mini-index}}$ at 15,000 and vary the total cache capacity. When the capacity is sufficient to hold the working set, the hit ratio remains high and ideally converges to 1. When capacity is insufficient, QVCache exhibits the expected degradation in hit ratio, similar to conventional caches, while recall remains largely unaffected.
-
-On the right, we fix the total cache capacity at 60,000 and vary $c_{\text{mini-index}}$. We find that $c_{\text{mini-index}}$ has little impact on overall hit ratio and recall. However, larger mini-indexes result in more information being evicted at once. If recently evicted vectors are accessed again shortly afterward, this can temporarily reduce the hit ratio. Consequently, partitioning the total capacity across multiple mini-indexes is generally preferable, although this introduces additional hit latency, as discussed in Section 6.4.
+In summary, augmenting a state-of-the-art in-memory backend such as FAISS with QVCache results in approximately $40\times$ lower p50 latency. For disk-based vector search systems, augmenting them with QVCache yields $\approx 100$–$\approx 500\times$ reductions in p50 latency, and for cloud-hosted systems such as Pinecone, the benefit is magnified to nearly $1000\times$ by eliminating network latency on cache hits.
 
 \begin{figure}[h]
 \centering
@@ -287,6 +360,17 @@ Right: varying $c_{\text{mini-index}}$ with fixed total capacity.}
 \end{figure}
 
 
+
+\subsection{Sensitivity to Cache Capacity and Mini Index Partitioning}
+
+As first noted by Belady \cite{belady1966study}, an ideal cache would retain exactly the items that will be accessed again and evict only those that will never be referenced in the future. Such optimal behavior is attainable only with an unbounded cache or an oracle that perfectly predicts future accesses. Since neither assumption is practical, real systems are inherently constrained by finite capacity and imperfect eviction decisions. The same limitations apply to QVCache.
+
+To assess how well QVCache maintains high hit ratios under fixed capacity, we repeat the experiment from Figure \ref{fig:dataset-experiments} on the SIFT dataset using identical parameters, except with $N_{\text{round}} = 2$, as shown in Figure \ref{fig:cache_size_experiments}. Perturbed copies of a base split within a window bring approximately 15,000 vectors into the cache. With a window size of 4, the working set therefore contains roughly 60,000 vectors. Since the stride is 1, the working set changes by about 25\% at each window slide. An ideal configuration for this workload would thus set $c_{\text{mini-index}} = 15{,}000$ and a total cache capacity of at least 60,000 vectors.
+
+In practice, however, estimating working set sizes and shift rates can be difficult. We therefore examine QVCache’s sensitivity to total cache capacity and $c_{\text{mini-index}}$ in Figure \ref{fig:cache_size_experiments}. On the left, we fix $c_{\text{mini-index}}$ at 15,000 and vary the total cache capacity. When the capacity is sufficient to hold the working set, the hit ratio remains high and ideally converges to 1. When capacity is insufficient, QVCache exhibits the expected degradation in hit ratio, similar to conventional caches, while recall remains largely unaffected.
+
+On the right, we fix the total cache capacity at 60,000 and vary $c_{\text{mini-index}}$. We find that $c_{\text{mini-index}}$ has little impact on overall hit ratio and recall. However, larger mini-indexes result in more information being evicted at once. If recently evicted vectors are accessed again shortly afterward, this can temporarily reduce the hit ratio. Consequently, partitioning the total capacity across multiple mini-indexes is generally preferable, although this introduces additional hit latency, as discussed in Section 6.4.
+
 \begin{figure}[h]
     \centering
 
@@ -296,14 +380,14 @@ Right: varying $c_{\text{mini-index}}$ with fixed total capacity.}
         \label{fig:plot1}
     \end{subfigure}
 
-    \caption{Effect of mini-index granularity on QVCache performance. The total cache capacity is fixed at 50{,}000 vectors, while the number of mini-indexes is varied to control per–mini-index capacity.
+    \caption{Effect of mini-index granularity on QVCache performance on the SIFT dataset . The total cache capacity is fixed at 60{,}000 vectors, while the number of mini-indexes is varied to control per–mini-index capacity.
 }
     \label{fig:granularity-effect}
 \end{figure}
 
 \subsection{Granularity Matters: Balancing Eviction Cost and Hit Latency}
 
-The granularity at which data is stored and retrieved has been extensively studied for decades. This includes classic work on page-size selection in database buffer pools and operating system caches~\cite{gray1998fiveminuteruleyearslater,7816668}, as well as more recent studies in cloud database systems, where access costs to remote storage layers are significantly higher~\cite{Zimmerer_2025}. These works explore different trade-offs, such as balancing I/O amortization against eviction cost and cache efficiency. For example, modern analytical systems like Snowflake~\cite{10.1145/2882903.2903741} store data in micropartitions to carefully balance parallelism, metadata overhead, and networked storage access costs. In traditional database systems, this problem is typically framed as finding an appropriate balance between the number of I/O operations required per record access and the effectiveness of the buffer cache.
+The granularity at which data is stored and retrieved has been extensively studied for decades, including page-size selection in database buffer pools and operating systems ~\cite{gray1998fiveminuteruleyearslater,7816668}, as well as chunked storage layouts in cloud-based analytic systems ~\cite{Zimmerer_2025}. In our setting, mini-indexes are analogous to pages, and $c_{\text{mini-index}}$, the capacity of a mini-index, is analogous to page size. Consequently, we observe similar trade-offs between search performance and the information lost at each eviction event.
 
 Larger mini-indexes incur higher information loss upon eviction, as evicting a single mini-index removes a larger set of cached vectors at once. In the extreme case where $n_{\text{mini-index}} = 1$, the entire cache contents are evicted upon the first cache miss after the cache reaches full capacity. This motivates partitioning the cache into finer-grained units using multiple mini-indexes, thereby reducing eviction-induced information loss.
 
@@ -337,7 +421,7 @@ Based on our experimental results, QVCache capacity should not be scaled vertica
 
 QVCache dynamically adjusts similarity thresholds during execution. In addition, it allows explicit control over the trade-off between recall and cache hit ratio through the deviation factor, $D$.
 
-We conducted an experiment on the SIFT dataset in which all settings were kept identical to those described in Section 6.2, except that $D$ was varied as a controlled parameter. The results, shown in Figure~\ref{fig:deviation-factor-experiment}, demonstrate that increasing $D$ leads to a higher cache hit ratio at the cost of reduced recall. In practice, this trade-off exhibits a saturation effect: beyond a certain point, further increasing $D$ yields diminishing improvements in hit ratio and only marginal reductions in recall.
+We repeated the experiment in Section \ref{sec:dataset-experiments} on SIFT, varying $D$. The results, shown in Figure~\ref{fig:deviation-factor-experiment}, demonstrate that increasing $D$ leads to a higher cache hit ratio at the cost of reduced recall. In practice, this trade-off exhibits a saturation effect: beyond a certain point, further increasing $D$ yields diminishing improvements in hit ratio and only marginal reductions in recall.
 
 There is no universal rule for selecting an appropriate deviation factor, as it depends on multiple factors including the dataset, vector dimensionality, query distribution, and distance metric. We therefore recommend initializing $D$ with a conservative value and gradually increasing it while monitoring recall and hit-ratio metrics. Since QVCache does not maintain any internal state that depends on $D$, adjusting this parameter can be performed online without requiring system downtime.
 
@@ -359,7 +443,7 @@ There is no universal rule for selecting an appropriate deviation factor, as it 
 \subsection{Spatial Thresholds Are Key to Correct Cache Hit/Miss Decisions}
 Vector distributions vary significantly across the vector space: some regions are densely clustered, while others are sparse. This heterogeneity makes it impractical to rely on a single global similarity threshold for all cache hit decisions.
 
-To evaluate this effect, we repeated the experiment from Section 5.2 on the SIFT dataset under two configurations: one using a single global threshold and the other using spatial thresholds. As shown in Figure~\ref{fig:spatial-threshold-experiment}, the global threshold aggregates updates from cache misses across all regions, failing to capture local patterns and causing up to a 15\% loss in recall due to incorrect hit/miss decisions. In contrast, spatial thresholds adapt to local variations in the query distribution, limiting recall degradation to at most 2–3\%, demonstrating their effectiveness in preserving the backend database’s accuracy.
+To evaluate this effect, we repeated the experiment from Section \ref{sec:dataset-experiments} on the SIFT dataset under two configurations: one using a single global threshold and the other using spatial thresholds. As shown in Figure~\ref{fig:spatial-threshold-experiment}, the global threshold aggregates updates from cache misses across all regions, failing to capture local patterns and causing up to a 15\% loss in recall due to incorrect hit/miss decisions. In contrast, spatial thresholds adapt to local variations in the query distribution, limiting recall degradation to at most 2–3\%, demonstrating their effectiveness in preserving the backend database’s accuracy.
 
 
 \begin{figure}[h]
@@ -510,159 +594,6 @@ In Figure~\ref{fig:noise-ratio-experiments}, we evaluate how the noise ratio $\e
 This result reveals an important phenomenon: pairwise uniqueness among queries does not imply global dissimilarity across a workload. Although no two perturbed queries share top-$k$ neighbors, the collective set of vectors they reference still exhibits overlap at scale. This is reflected in the curves for $\eta = 0.4$ and $\eta = 0.6$, where the number of vectors inserted into the cache increases only modestly. Thus, QVCache may remain effective even when similar queries do not repeat, leveraging potential collaboration across many unique queries rather than relying solely on strict temporal-semantic locality.
 
 
-
-
-
-\begin{figure*}[t]
-\centering
-
-% Adjusted column width for 5 columns (roughly 1/5 of text width)
-\setlength{\colwidth}{0.18\textwidth}
-
-% ===== Row 1: hit_ratio =====
-%\begin{subfigure}{\colwidth}
-%    \includegraphics[width=\linewidth]{plots/backend_experiments/faiss/hit_ratio.pdf}
-%\end{subfigure}
-%\begin{subfigure}{\colwidth}
-%    \includegraphics[width=\linewidth]{plots/backend_experiments/qdrant/hit_ratio.pdf}
-%\end{subfigure}
-%\begin{subfigure}{\colwidth}
-%    \includegraphics[width=\linewidth]{plots/backend_experiments/pgvector/hit_ratio.pdf}
-%\end{subfigure}
-%\begin{subfigure}{\colwidth}
-%    \includegraphics[width=\linewidth]{plots/backend_experiments/pinecone/hit_ratio.pdf}
-%\end{subfigure}
-%\begin{subfigure}{\colwidth}
-%    \includegraphics[width=\linewidth]{plots/backend_experiments/sptag/hit_ratio.pdf}
-%\end{subfigure}
-
-% ===== Row 2: avg_hit_latency =====
-%\begin{subfigure}{\colwidth}
-%    \includegraphics[width=\linewidth]{plots/backend_experiments/faiss/avg_hit_latency.pdf}
-%\end{subfigure}
-%\begin{subfigure}{\colwidth}
-%    \includegraphics[width=\linewidth]{plots/backend_experiments/qdrant/avg_hit_latency.pdf}
-%\end{subfigure}
-%\begin{subfigure}{\colwidth}
-%    \includegraphics[width=\linewidth]{plots/backend_experiments/pgvector/avg_hit_latency.pdf}
-%\end{subfigure}
-%\begin{subfigure}{\colwidth}
-%    \includegraphics[width=\linewidth]{plots/backend_experiments/pinecone/avg_hit_latency.pdf}
-%\end{subfigure}
-%\begin{subfigure}{\colwidth}
-%    \includegraphics[width=\linewidth]{plots/backend_experiments/sptag/avg_hit_latency.pdf}
-%\end{subfigure}
-
-% ===== Row 3: p50_latency =====
-\begin{subfigure}{\colwidth}
-    \includegraphics[width=\linewidth]{plots/backend_experiments/faiss/p50_latency.pdf}
-\end{subfigure}
-\begin{subfigure}{\colwidth}
-    \includegraphics[width=\linewidth]{plots/backend_experiments/qdrant/p50_latency.pdf}
-\end{subfigure}
-\begin{subfigure}{\colwidth}
-    \includegraphics[width=\linewidth]{plots/backend_experiments/pgvector/p50_latency.pdf}
-\end{subfigure}
-\begin{subfigure}{\colwidth}
-    \includegraphics[width=\linewidth]{plots/backend_experiments/pinecone/p50_latency.pdf}
-\end{subfigure}
-\begin{subfigure}{\colwidth}
-    \includegraphics[width=\linewidth]{plots/backend_experiments/sptag/p50_latency.pdf}
-\end{subfigure}
-
-% ===== Row 4: qps =====
-%\begin{subfigure}{\colwidth}
-%    \includegraphics[width=\linewidth]{plots/backend_experiments/faiss/qps.pdf}
-%\end{subfigure}
-%\begin{subfigure}{\colwidth}
-%    \includegraphics[width=\linewidth]{plots/backend_experiments/qdrant/qps.pdf}
-%\end{subfigure}
-%\begin{subfigure}{\colwidth}
-%    \includegraphics[width=\linewidth]{plots/backend_experiments/pgvector/qps.pdf}
-%\end{subfigure}
-%\begin{subfigure}{\colwidth}
-%    \includegraphics[width=\linewidth]{plots/backend_experiments/pinecone/qps.pdf}
-%\end{subfigure}
-%\begin{subfigure}{\colwidth}
-%    \includegraphics[width=\linewidth]{plots/backend_experiments/sptag/qps.pdf}
-%\end{subfigure}
-
-% ===== Row 5: recall =====
-\begin{subfigure}{\colwidth}
-    \includegraphics[width=\linewidth]{plots/backend_experiments/faiss/recall.pdf}
-\end{subfigure}
-\begin{subfigure}{\colwidth}
-    \includegraphics[width=\linewidth]{plots/backend_experiments/qdrant/recall.pdf}
-\end{subfigure}
-\begin{subfigure}{\colwidth}
-    \includegraphics[width=\linewidth]{plots/backend_experiments/pgvector/recall.pdf}
-\end{subfigure}
-\begin{subfigure}{\colwidth}
-    \includegraphics[width=\linewidth]{plots/backend_experiments/pinecone/recall.pdf}
-\end{subfigure}
-\begin{subfigure}{\colwidth}
-    \includegraphics[width=\linewidth]{plots/backend_experiments/sptag/recall.pdf}
-\end{subfigure}
-
-% ===== Row 6: memory_active_vectors =====
-%\begin{subfigure}{\colwidth}
-%    \includegraphics[width=\linewidth]{plots/backend_experiments/faiss/memory_active_vectors.pdf}
-%\end{subfigure}
-%\begin{subfigure}{\colwidth}
-%    \includegraphics[width=\linewidth]{plots/backend_experiments/qdrant/memory_active_vectors.pdf}
-%\end{subfigure}
-%\begin{subfigure}{\colwidth}
-%    \includegraphics[width=\linewidth]{plots/backend_experiments/pgvector/memory_active_vectors.pdf}
-%\end{subfigure}
-%\begin{subfigure}{\colwidth}
-%    \includegraphics[width=\linewidth]{plots/backend_experiments/pinecone/memory_active_vectors.pdf}
-%\end{subfigure}
-%\begin{subfigure}{\colwidth}
-%    \includegraphics[width=\linewidth]{plots/backend_experiments/sptag/memory_active_vectors.pdf}
-%\end{subfigure}
-
-% ===== Row 7: Column captions =====
-\begin{subfigure}{\colwidth}
-    \centering
-    \vspace{0.5em}
-    \hspace{2em}(a) \textbf{FAISS}
-\end{subfigure}
-\begin{subfigure}{\colwidth}
-    \centering
-    \vspace{0.5em}
-    \hspace{2em}(b) \textbf{Qdrant}
-\end{subfigure}
-\begin{subfigure}{\colwidth}
-    \centering
-    \vspace{0.5em}
-    \hspace{2em}(c) \textbf{pgvector}
-\end{subfigure}
-\begin{subfigure}{\colwidth}
-    \centering
-    \vspace{0.5em}
-    \hspace{2em}(d) \textbf{Pinecone}
-\end{subfigure}
-\begin{subfigure}{\colwidth}
-    \centering
-    \vspace{0.5em}
-    \hspace{2em}(e) \textbf{SPANN}
-\end{subfigure}
-
-\caption{Performance of Various Backend Databases With and Without QVCache on DEEP Dataset}
-\label{fig:backend-experiments}
-\end{figure*}
-
-\subsection{Backend-Agnostic Caching}
-
-QVCache is compatible with any vector search system, independent of the underlying index type, system scale, or deployment environment, requiring only the implementation of standard search and fetch interfaces. To illustrate this property, we conduct the experiments shown in Figure \ref{fig:backend-experiments}, using the same parameter settings as in Section 6.2 for the DEEP dataset. All backends are evaluated both with and without QVCache. FAISS, Qdrant, and pgvector are deployed on the Linux host described in Section 6.2, while Pinecone is evaluated using its managed cloud service.
-
-Pinecone \cite{pinecone}, a cloud-managed vector search service, exhibits relatively high latencies ($\approx$ 100 ms) due to network round-trip overheads. As shown in Figure \ref{fig:backend-experiments}, integrating QVCache on the client side bypasses this network latency and reduces p50 latency by up to three orders of magnitude ($\approx$ 1000×). Although cache-miss fetches may incur additional time, we observe no degradation in recall or hit-rate convergence. %Beyond latency reduction, QVCache also lowers serving costs for services billed on a per-query basis by converting a large fraction of requests into local, non-billable cache hits.
-
-For hybrid memory–disk backends, such as Qdrant \cite{qdrant2025} and SPANN \cite{spann}, and disk-only backends like pgvector \cite{pgvector}, QVCache provides substantial latency improvements by fronting their client libraries. Specifically, we observe up to $\approx$100×, $\approx$300×, and $\approx$500× reductions in p50 latency for Qdrant, SPANN, and pgvector, respectively. While our experiments use client-side integration, embedding QVCache directly within these systems would enable cross-client caching, exploiting a global view of incoming queries and allowing multiple clients’ requests to be served more efficiently through better aggregation.
-
-Even for fully in-memory backends such as FAISS, QVCache achieves up to 40× latency reduction. Here, both the backend and QVCache maintain indexes and vectors in memory, yet cache hits are faster because QVCache constrains the search space, allowing best-first search to converge in fewer steps. Nonetheless, QVCache introduces an in-cache probe for every request; when backend latency is already low and cache hit rates are limited, this overhead can be non-negligible.
-
-In summary, augmenting a state-of-the-art in-memory backend such as FAISS with QVCache results in approximately $40\times$ lower p50 latency. For disk-based vector search systems, augmenting them with QVCache yields $\approx 100$–$\approx 500\times$ reductions in p50 latency, and for cloud-hosted systems such as Pinecone, the benefit is magnified to nearly $1000\times$ by eliminating network latency on cache hits.
 
 
 
