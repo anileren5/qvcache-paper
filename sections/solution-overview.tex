@@ -4,26 +4,8 @@ We introduce \textbf{QVCache}, a query-level cache for vector search that opport
 
 QVCache operates as a transparent layer in front of an existing vector database. It neither modifies backend index structures nor depends on backend-specific heuristics. Instead, it exploits workload locality to amortize expensive ANN execution across semantically similar queries, while bounding cache memory usage and lookup latency independently of dataset size.
 
-\begin{figure}[htbp]
-  \centering
-  \begin{subfigure}[t]{0.50\linewidth}
-    \centering
-    \includegraphics[width=\linewidth]{figures/hit.pdf}
-    \caption{Cache hit}
-    \label{fig:hit}
-  \end{subfigure}\hfill
-  \begin{subfigure}[t]{0.50\linewidth}
-    \centering
-    \includegraphics[width=\linewidth]{figures/miss.pdf}
-    \caption{Cache miss}
-    \label{fig:miss}
-  \end{subfigure}
-    \caption{Handling cache hits and misses in QVCache with four mini-indexes, each with a capacity of three vectors, using an LRU eviction policy.}
-  \label{fig:architecture}
-\end{figure}
-
-
 \subsection{Workload Characteristics}  
+\label{sec:workload-characteristics}
 Traditional caching relies on temporal locality alone, assuming that identical requests recur. Vector search workloads violate this assumption: even minor variations in phrasing or prompts yield distinct embeddings, rendering exact-match caching ineffective. However, production workloads often exhibit a stronger property that we term \emph{temporal-semantic locality}: queries that are close in time are frequently close in embedding space.
 
 This behavior has been observed in e-commerce search, where multiple formulations reflect the same purchase intent, and in conversational and RAG workloads, where users iteratively refine prompts. Prior studies further show that temporal access patterns correlate with semantic similarity in real search workloads. Because semantically similar queries tend to retrieve highly overlapping nearest-neighbor sets, caching vectors retrieved by one query can accelerate subsequent, nearby queries without degrading recall.
@@ -32,6 +14,25 @@ Empirical evidence from industrial systems reinforces this observation; in large
 %Unlike traditional caching, which relies solely on temporal locality, we coin the term \textit{temporal-semantic locality} to describe the behavior where semantically similar (i.e. spatially closer) queries repeat over time. This pattern is especially prevalent in e-commerce search~\cite{semanticequivalenceecommercequeries} and chatbot systems~\cite{gptcache}, where different phrasings reflect the same intent and yield nearby embeddings. Prior work further indicates that temporal access patterns correlate with semantic similarity in search workloads~\cite{semantic-similarity-temporal-correlation}. Because such queries often retrieve overlapping nearest-neighbor sets, QVCache can maintain a compact hot set of vectors in memory and efficiently serve repeated, similar queries.
 
 %In an industrial vector search workload, production evidence shows that only about 15\% of IVF partitions are accessed over an entire day~\cite{incrementalivfindexmaintenance}. At the short timescales relevant for caching, for example minutes or even seconds, the active portion of the dataset is likely far below 1\%. This access skew makes vector caching highly practical. Leveraging these properties, QVCache achieves orders of magnitude lower latency (up to 300×) and corresponding throughput gains on a cache hit, while maintaining a minimal and bounded memory footprint.
+
+\begin{figure}[!htb]
+  \centering
+  \begin{subfigure}[b]{0.6\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/hit.pdf}
+    \caption{Cache hit}
+    \label{fig:hit}
+  \end{subfigure}
+  \hspace{0.04\linewidth}
+  \begin{subfigure}[b]{0.6\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/miss.pdf}
+    \caption{Cache miss}
+    \label{fig:miss}
+  \end{subfigure}
+  \caption{Handling cache hits and misses in QVCache with four mini-indexes, each with a capacity of three vectors, using an LRU eviction policy.}
+  \label{fig:architecture}
+\end{figure}
 
 \subsection{Query Flow through QVCache}  
 QVCache processes every incoming query before it reaches the backend database. It first performs a \emph{cache search} over a collection of in-memory mini-indexes, each implemented as a small dynamic ANN graph i.e. a FreshVamana index. The cache search produces a candidate set of $k$ nearest neighbors.
