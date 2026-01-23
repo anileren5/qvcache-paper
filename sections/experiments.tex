@@ -335,8 +335,7 @@ Even for fully in-memory backends such as FAISS, QVCache achieves up to 40× lat
 
 In summary, augmenting a state-of-the-art in-memory backend such as FAISS with QVCache results in approximately $40$× lower p50 latency. For disk-based vector search systems, augmenting them with QVCache yields $\approx 100$–$ 500$× reductions in p50 latency, and for cloud-hosted systems such as Pinecone, the benefit is magnified to nearly $1000$× by eliminating network latency on cache hits.
 
-
-\begin{figure}[h]
+\begin{figure}[t]
     \centering
 
     \begin{subfigure}{0.7\linewidth}
@@ -348,7 +347,6 @@ In summary, augmenting a state-of-the-art in-memory backend such as FAISS with Q
     \caption{Impact of Global vs. Spatial Threshold(s) on Recall}
     \label{fig:spatial-threshold-experiment}
 \end{figure}
-
 
 \subsection{Spatial Thresholds Are Key to Correct Cache Hit/Miss Decisions}
 \label{sec:spatial-thresholds}
@@ -372,7 +370,7 @@ To further analyze this trade-off, we conducted the experiment shown in Figure~\
         \label{fig:plot1}
     \end{subfigure}
 
-    \caption{Effect of mini-index granularity on QVCache performance on the SIFT dataset . The total cache capacity is fixed at 60{,}000 vectors, while the number of mini-indexes is varied to control per–mini-index capacity.
+    \caption{Effect of mini-index granularity on QVCache performance on the SIFT dataset . The total cache capacity is fixed at 100{,}000 vectors, while the number of mini-indexes is varied to control per–mini-index capacity.
 }
     \label{fig:granularity-effect}
 \end{figure}

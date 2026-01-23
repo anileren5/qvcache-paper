@@ -205,21 +205,19 @@ For instance, if ${\text{d}}_{\text{reduced}} = 8$, the memory requirement becom
 \end{figure}
 
 
-\begin{figure*}[h]
+\begin{figure*}[t]
     \centering
     \begin{subfigure}[t]{0.48\textwidth}
         \centering
-        \input{figures/query_perturbation}
-        \caption{Synthesizing Queries with Semantic (Spatial) Locality}
+        \includegraphics[width=\linewidth,trim=0 120 0 0,clip]{figures/perturbation.pdf}
+        \caption{Synthesizing queries with semantic (spatial) locality.}
         \label{fig:query-perturbation}
     \end{subfigure}
     \hfill
     \begin{subfigure}[t]{0.48\textwidth}
         \centering
-        \resizebox{0.8\textwidth}{!}{
-            \input{figures/sliding_window_experiment}
-        }
-        \caption{Workload Generation with temporal-semantic Locality}
+        \includegraphics[width=\linewidth,trim=0 120 0 0,clip]{figures/workload-generation.pdf}
+        \caption{Workload generation with temporal–semantic locality.}
         \label{fig:sliding-window}
     \end{subfigure}
     \caption{Evaluation framework proposed in this paper for benchmarking vector caches, used to evaluate QVCache.}

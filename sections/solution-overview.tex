@@ -17,22 +17,33 @@ Empirical evidence from industrial systems reinforces this observation; in large
 
 \begin{figure}[!htb]
   \centering
-  \begin{subfigure}[b]{0.6\linewidth}
+
+  % Top subfigure: cache hit, bottom part cropped away
+  \begin{subfigure}[b]{0.75\linewidth}
     \centering
-    \includegraphics[width=\linewidth]{figures/hit.pdf}
+    \includegraphics[
+      width=\linewidth,
+      clip,
+      trim=0 5cm 0 0 % left bottom right top (tune 3cm as needed)
+    ]{figures/cache-hit.pdf}
     \caption{Cache hit}
     \label{fig:hit}
   \end{subfigure}
-  \hspace{0.04\linewidth}
-  \begin{subfigure}[b]{0.6\linewidth}
+  
+  \vspace{0.2cm} % <-- small vertical space between the two subfigures
+
+  % Bottom subfigure: cache miss, unchanged
+  \begin{subfigure}[b]{0.75\linewidth}
     \centering
-    \includegraphics[width=\linewidth]{figures/miss.pdf}
+    \includegraphics[width=\linewidth]{figures/cache-miss.pdf}
     \caption{Cache miss}
     \label{fig:miss}
   \end{subfigure}
+
   \caption{Handling cache hits and misses in QVCache with four mini-indexes, each with a capacity of three vectors, using an LRU eviction policy.}
   \label{fig:architecture}
 \end{figure}
+
 
 \subsection{Query Flow through QVCache}  
 QVCache processes every incoming query before it reaches the backend database. It first performs a \emph{cache search} over a collection of in-memory mini-indexes, each implemented as a small dynamic ANN graph i.e. a FreshVamana index. The cache search produces a candidate set of $k$ nearest neighbors.
@@ -52,3 +63,5 @@ QVCache initializes empty and fills its mini-indexes upon cache misses. Memory u
 
 By short-circuiting backend ANN execution on cache hits, QVCache substantially reduces query latency and backend load. In cloud-based deployments where vector search is billed per query~\cite{ZillizServerless2025}, this reduction directly translates into lower operational cost, particularly at large scale.
 %Thanks to this architecture, QVCache achieves a significant reduction in query latency by serving queries directly from the cache on a hit. The high cache-hit rate also translates into lower operational costs for cloud-based systems, where billing is often charged per query~\cite{ZillizServerless2025}, which can become expensive for large datasets.
+
+For workloads that require insertions and deletions of vectors (assuming the index on backend database supports these operations), QVCache does not yet handle them natively. Insert and delete queries should therefore be routed directly to the backend, bypassing QVCache. The resulting updates eventually propagate into QVCache through evictions and subsequent cache fills, and the approximate nature of vector search makes this eventual consistency acceptable in practice. As future work, we plan to add native support for insertions and deletions by buffering them in QVCache and asynchronously applying them to the backend, which we expect to further improve insertion and deletion throughput.
