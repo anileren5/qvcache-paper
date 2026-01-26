@@ -20,7 +20,7 @@ A natural response to repeated expensive computation is caching. Across the syst
 Existing ANN systems rely on index-internal heuristics—such as caching centroids~\cite{diskann} or upper graph layers~\cite{tiered-cache-hnsw}—to reduce average I/O. These mechanisms reduce constant factors but cannot eliminate backend execution, cannot exploit workload locality at the query level, and cannot generalize across ANN backends. Consequently, operators are forced into a persistent tradeoff between memory cost and latency, with no mechanism to amortize query work across time.
 
 % insight
-The key insight of this work is that query repetition in vector search is semantic rather than exact. Real workloads exhibit temporal locality in embedding space: while query vectors are rarely identical, they are often sufficiently close that their nearest-neighbor sets are interchangeable at target recall. Exploiting this locality requires treating caching as a similarity problem rather than an exact lookup problem~\cite{similarity-caching}. However, similarity caching in high-dimensional vector spaces introduces two unresolved systems challenges: (1) selecting similarity thresholds that preserve recall without collapsing hit rates, and (2) performing cache lookups efficiently without turning the cache itself into a nearest neighbor index with unbounded latency and memory growth. Naively addressing either challenge leads to unbounded false positives that lower recall, or to cache designs whose overhead rivals the backend ANN system.
+The key insight of this work is that query repetition in vector search is \emph{semantic} rather than exact. Real workloads exhibit temporal locality in embedding space: while query vectors are rarely identical, they are often sufficiently close that their nearest-neighbor sets are interchangeable at target recall. Exploiting this locality requires treating caching as a similarity problem rather than an exact lookup problem~\cite{similarity-caching}. However, similarity caching in high-dimensional vector spaces introduces two unresolved systems challenges: (1) selecting similarity thresholds that preserve recall without collapsing hit rates, and (2) performing cache lookups efficiently without turning the cache itself into a nearest neighbor index with unbounded latency and memory growth. Naively addressing either challenge leads to unbounded false positives that lower recall, or to cache designs whose overhead rivals the backend ANN system.
 
 Prior work on similarity caching provides theoretical foundations but does not address the constraints of ANN serving systems~\cite{similarity-caching,similarity-caching-theory-algorithms}. Existing practical systems for LLM response caching rely on fixed global thresholds~\cite{gptcache}, which perform poorly under heterogeneous query distributions, or tightly couple caching logic to a specific index structure~\cite{vcache}. None provide a general, query-level cache that is backend-agnostic, recall-aware, and resource-bounded.
 
@@ -31,18 +31,21 @@ QVCache assigns region-specific similarity thresholds in the embedding space and
 
 % impact of the solution
 
-QVCache is designed as a drop-in layer for existing ANN systems. It requires no changes to index construction, applies uniformly to in-memory and disk-based backends. Unlike ANN indexes, QVCache does not grow with dataset size, does not aim for asymptotic recall completeness, and never replaces backend search on cache misses. By converting semantic locality into amortized query execution, QVCache reduces backend load and latency in high-recall settings without increasing memory pressure. This allows meeting latency SLOs at high recall without provisioning fully in-memory ANN indexes.
+QVCache is designed as a drop-in layer for existing ANN systems. It requires no changes to index construction, applies uniformly to any backend vector database, independent of whether it is in-memory or disk-based. %Unlike ANN indexes, QVCache does not grow with dataset size, does not aim for asymptotic recall completeness, and falls back to backend search on cache misses. 
+Leveraging semantic locality, QVCache converts costly backend queries into cache hits, reducing both backend load and query latency with minimal memory overhead. This enables meeting latency SLOs at high recall without requiring in-memory indexes to scale with the dataset size; instead, they scale with the \emph{working set}, which is much smaller in practice \cite{incrementalivfindexmaintenance}.
 
 % contributions
 The contributions of this paper are:
 \begin{itemize}
-    \item A formulation of query-level vector caching as a similarity-aware, recall-constrained systems problem.
+    \item A formulation of query-level vector caching as a similarity caching problem.
 
-    \item The design of QVCache, a backend-agnostic ANN cache with adaptive, region-specific similarity thresholds and bounded latency and memory, which we show can reduce end-to-end latency by up to \(40\text{–}1000×\) when integrated with existing ANN systems, while maintaining a memory footprint typically below 1\% of fully in-memory indexes.
+    \item The design of QVCache, a backend-agnostic ANN cache with adaptive, region-specific similarity thresholds and bounded latency and memory, which we show can reduce end-to-end latency by up to \(40\text{–}1000\times\) when integrated with existing ANN systems, while maintaining a memory footprint typically below 1\% of fully in-memory indexes.
 
-    \item An online threshold-learning algorithm driven by observed nearest-neighbor distance statistics.
+    % \item An online threshold-learning algorithm driven by observed nearest-neighbor distance statistics.
 
     \item A workload generation benchmarking framework for controlled temporal-semantic locality in vector search, enabling reproducible evaluation of vector caching systems.
+
+    \item Comprehensive experiments showing the benefits of QVCache under diverse datasets and backend vector databases (in-memory, disk-based, on-premise, or cloud-based).
 \end{itemize}
 
 \begin{comment}
