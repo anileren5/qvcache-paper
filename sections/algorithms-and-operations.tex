@@ -67,7 +67,7 @@ QVCache is a query-level vector cache, analogous to systems like Redis~\cite{red
 \begin{algorithmic}[1]
 \State \textbf{Input:} Query vector $Q$, result size $k$, distances of candidate neighbors to query $\text{d}_{\text{cache}}$ (sorted in ascending order)
 \State \textbf{Output:} True for cache hit, False otherwise
-\State $R \gets \textsc{ComputeRegionKey}(Q)$ \label{alg:line:compute-region-key}
+\State $R \gets \textsc{ComputeRegionKey}(Q)$ \label{alg:line:compute-region-key} \
 \If{$\text{d}_{\text{cache}}[k] \le (1 + D) \cdot \theta[k][R]$} \label{alg:line:cachecheck}
     \State \Return True
 \EndIf
@@ -93,7 +93,7 @@ C(N) \propto n_{\text{mini-index}} \cdot \log\left(c_{\text{mini-index}}\right).
 \label{exp:cache-search-cost}
 \end{equation}
 
-To reduce this cost, QVCache minimizes the number of mini-indexes it scans. Newly cached vectors are inserted into the hottest mini-indexes on a miss, so queries that result in cache hits are likely to find their nearest candidates in those same mini-indexes. QVCache exploits this locality by scanning mini-indexes in descending heat order (Line~\ref{alg:line:get-eviction-order} in Algorithm~\ref{alg:cache-search}). When it detects a hit in a mini-index, QVCache inserts the corresponding neighbors into the candidate set (Lines~\ref{alg:line:check-hit}, \ref{alg:line:add-candidates}). Under the \texttt{EAGER} strategy, the search terminates after the first hit, whereas \texttt{EXHAUSTIVE} scans all mini-indexes and re-ranks the union of retrieved candidates (Line~\ref{alg:line:rerank}). In practice, \texttt{EAGER} detects a hit (when one exists) after scanning only the first few mini-indexes, effectively removing the linear factor in the cost expression in \ref{exp:cache-search-cost}.
+To reduce this cost, QVCache minimizes the number of mini-indexes it scans. Newly cached vectors are inserted into the hottest mini-indexes on a miss, so queries that result in cache hits are likely to find their nearest candidates in those same mini-indexes. QVCache exploits this temporal locality by scanning mini-indexes in descending heat order (Line~\ref{alg:line:get-eviction-order} in Algorithm~\ref{alg:cache-search}). When it detects a hit in a mini-index, QVCache inserts the corresponding neighbors into the candidate set (Lines~\ref{alg:line:check-hit}, \ref{alg:line:add-candidates}). Under the \texttt{EAGER} strategy, the search terminates after the first hit, whereas \texttt{EXHAUSTIVE} scans all mini-indexes and re-ranks the union of retrieved candidates (Line~\ref{alg:line:rerank}). The mini-indexes that contribute candidates to a cache hit are promoted to the hottest mini-indexes (Line \ref{alg:line:update-lru}). In practice, \texttt{EAGER} detects a hit (when one exists) after scanning only the first few mini-indexes, effectively removing the linear factor in the cost expression in \ref{exp:cache-search-cost}.
 
 While \texttt{EXHAUSTIVE} strategy is effective at recovering high-quality candidate sets, its cost grows linearly with $n{_\text{mini-index}}$. In contrast, \texttt{EAGER} exhibits near constant-time behavior with respect to $n{_\text{mini-index}}$ in typical settings; under high hit rates, the first mini-index alone often suffices. To balance these trade-offs, QVCache’s \texttt{ADAPTIVE} policy monitors recent hit ratios and switches between \texttt{EAGER} and \texttt{EXHAUSTIVE}: when the hit rate exceeds a threshold (e.g.,~0.9), it uses \texttt{EAGER}; otherwise, it falls back to \texttt{EXHAUSTIVE}. Empirically, \texttt{ADAPTIVE} performs well, though users may choose any strategy depending on their recall–latency requirements.
 
@@ -115,7 +115,7 @@ The larger the mini-indexes, the greater the information loss upon eviction: evi
 
 \subsection{Cache Hit and Miss Decisions}
 \label{sec:threshold-challenges}
-Deciding if a vector search query can be answered from cache (Algorithm~\ref{alg:is-hit}) is a similarity caching problem~\cite{similarity-caching, similarity-caching-theory-algorithms}. A query is considered a cache hit if the distance of the query vector to the furthest vector, $d_{\text{cache}}[k]$, in the candidate neighbor set is less than or equal to a \textit{similarity threshold}, $\theta[k][R]$. Determining the optimal threshold to maximize hit ratios while maintaining the recall of the backend database is challenging. If the threshold is too small, cache misses occur too frequently. If it is too large, cache hits return very different results from the backend, resulting in low recalls. We list four key challenges around the cache hit and miss decisions and respective solutions we propose.
+Deciding if a vector search query can be answered from cache (Algorithm~\ref{alg:is-hit}) is a similarity caching problem~\cite{similarity-caching, similarity-caching-theory-algorithms}. A query is considered a cache hit if the distance of the query vector to the furthest vector, $d_{\text{cache}}[k]$, in the candidate neighbor set is less than or equal to a \textit{similarity threshold}, $\theta[k][R]$, where $R$ is the identifier of the region the query falls into.. Determining the optimal threshold to maximize hit ratios while maintaining the recall of the backend database is challenging. If the threshold is too small, cache misses occur too frequently. If it is too large, cache hits return very different results from the backend, resulting in low recalls. We list four key challenges around the cache hit and miss decisions and respective solutions we propose.
 
 \vspace{1ex}
  \textbf{Challenge 1: No universal threshold across datasets.} Different datasets may require substantially different distance thresholds, making manual tuning impractical.  
@@ -150,7 +150,7 @@ Deciding if a vector search query can be answered from cache (Algorithm~\ref{alg
     \textit{Solution: Continuous learning.} QVCache runs Algorithm~\ref{alg:learn-threshold} continuously to adapt its thresholds, allowing it to track changes in query patterns.
 
 \vspace{1ex}
- \textbf{Challenge 4: No universal threshold across different $k$ values.} As the parameter $k$ in a vector search query increases, the system generally requires a higher threshold. However, the threshold for a larger $k$ (e.g., $k=10$) cannot be inferred from that of a smaller $k$ (e.g., $k=1$), as the relationship is highly nonlinear and often unpredictable across datasets.
+ \textbf{Challenge 4: No universal threshold across different $k$ values.} As the parameter $k$ in a vector search query increases, the system generally requires a higher threshold. However, the threshold for a larger $k$ (e.g., $k=10$) cannot be inferred from that of a smaller $k$ (e.g., $k=1$), as the relationship is highly nonlinear and often unpredictable across datasets \cite{10.14778/3712221.3712224}.
 
  \textit{Solution: $k$-dependent thresholds.} QVCache maintains an independent threshold for each observed $k$ and learns them separately.
 
@@ -185,28 +185,17 @@ In our experiments, we found that setting $\alpha = 0.9$ provides a good trade-o
 QVCache partitions the high-dimensional vector space into sub-spaces by dividing each dimension of the vector space into ${\text{n}}_{\text{buckets}}$ buckets. Upon receiving a query, it identifies the bucket corresponding to each dimension (\textsc{ComputeRegionKey}) to determine the appropriate spatial threshold.
 
 However, pre-allocating the buckets for all possible sub-spaces is infeasible, especially for high-dimensional vectors.
-For example, SIFT dataset vectors \cite{sift} have 128 dimensions, where storing the thresholds for all possible sub-spaces requires $128^{16}$ thresholds for ${\text{n}}_{\text{buckets}}$=16. 
+For example, SIFT dataset vectors \cite{sift} have 128 dimensions, where storing the thresholds for all possible sub-spaces requires $8^{128}$ thresholds for ${\text{n}}_{\text{buckets}}$=8. 
 
-\textbf{Dimensionality reduction.} Queries that are close in the original high-dimensional space remain close after projection into a lower-dimensional space, so the proximity relationships relevant for cache-hit decisions are approximately preserved. Therefore, QVCache projects incoming query vectors onto a lower-dimensional space via Principal Component Analysis (PCA) \cite{principalcomponentanalysis} and uses this reduced space for both threshold assignment and learning. QVCache performs a lightweight offline training step to compute the PCA transformation matrix, and this process does not require access to the full dataset; in our experiments, random sampling of as little as 0.1\%–0.01\% of the dataset was sufficient.
+\textbf{Dimensionality reduction.} Queries that are close in the original high-dimensional space remain close after projection into a lower-dimensional space, so the proximity relationships relevant for cache-hit decisions are approximately preserved. Therefore, QVCache projects incoming query vectors onto a lower-dimensional space via Principal Component Analysis (PCA) \cite{principalcomponentanalysis} and uses this reduced space for both threshold assignment and learning. QVCache performs a lightweight offline training step to compute the PCA transformation matrix, and this process does not require access to the full dataset; in our experiments, random sampling of as little as 0.1\%–0.01\% of the dataset was sufficient. On the SIFT dataset \cite{sift}, this lightweight training took around 10 minutes with a 0.1\% sampling ratio on the machine described in Section~\ref{sec:experimental-setup}.
 
 On top of the projection, QVCache applies a straightforward partitioning scheme, dividing each dimension of the reduced space into equal-sized buckets. More advanced partitioning strategies that account for dataset-specific characteristics could be explored as future work. The \textsc{ComputeRegionKey} function applies the learned PCA transformation to project each query into the reduced space and identifies its corresponding region by locating the buckets it falls into.
 
 
 
-For instance, if ${\text{d}}_{\text{reduced}} = 8$, the memory requirement becomes $8^{16}$ floating points for ${\text{n}}_{\text{buckets}}$=16. Although this technique significantly reduces the memory footprint, it still exceeds the practical constraints under which QVCache is designed to operate.
+For instance, if ${\text{d}}_{\text{reduced}} = 16$, the memory requirement becomes $8^{16}$ floating points for ${\text{n}}_{\text{buckets}}$=8. Although this technique significantly reduces the memory footprint, it still exceeds the practical constraints under which QVCache is designed to operate.
 
-\textbf{Lazy initialization.} Similar to how data vectors tend to cluster, queries also exhibit spatial locality, meaning that not every region of the vector space will receive queries. Consequently, QVCache does not allocate memory for thresholds in regions that have not yet been queried; a missing key implicitly represents a region which has not been queried yet. Memory is allocated only when the first query for a new region arrives and the threshold is initialized to $d_{backend}[k]$ (i.e. updating the threshold by setting $\alpha$ to 1 in Algorithm \ref{alg:learn-threshold}). Our experiments show that, at most 50,000 regions (using the SpaceV  dataset \cite{SPACEV1B_SPTAG} with ${\text{d}}_{\text{reduced}} = 16$ and ${\text{n}}_{\text{buckets}}$=16) become active, consuming approximately 200KB of memory. If the number of active regions exceeds a user-defined limit, QVCache can evict thresholds (by resetting them to zero and freeing memory) using an eviction policy such as LRU, and re-learn them later as needed. This lazy initialization, combined with dimensionality reduction, allows QVCache to maintain an exceptionally low memory footprint.
-
-
-
-
-\begin{figure}[h]
-    \centering
-    \includegraphics[width=0.75\linewidth]{plots/noise_ratio_analysis/neighbor_overlap_analysis.pdf}
-    \caption{\textbf{Nearest Neighbor overlap under perturbation (DEEP \cite{deep} dataset, $k=10$).} The overlap between the neighbor sets of the base and perturbed queries decays sharply, approaching near-zero at a noise ratio of 0.5.}
-    \label{fig:overlap-analysis}
-\end{figure}
-
+\textbf{Lazy initialization.} Similar to how data vectors tend to cluster, queries also exhibit spatial locality, meaning that not every region of the vector space will receive queries. Consequently, QVCache does not allocate memory for thresholds in regions that have not yet been queried; a missing key implicitly represents a region which has not been queried yet. Memory is allocated only when the first query for a new region arrives and the threshold is initialized to $d_{backend}[k]$ (i.e. updating the threshold by setting $\alpha$ to 1 in Algorithm \ref{alg:learn-threshold}). Our experiments show that, at most 50,000 regions (using the SpaceV  dataset \cite{SPACEV1B_SPTAG} with ${\text{d}}_{\text{reduced}} = 16$ and ${\text{n}}_{\text{buckets}}$=8), out of $8^{16}$ possible regions, become active, consuming approximately 200KB of memory. If the number of active regions exceeds a user-defined limit, QVCache can evict thresholds (by resetting them to zero and freeing memory) using an eviction policy such as LRU, and re-learn them later as needed. This lazy initialization, combined with dimensionality reduction, allows QVCache to maintain an exceptionally low memory footprint.
 
 \begin{figure*}[t]
     \centering
@@ -226,3 +215,12 @@ For instance, if ${\text{d}}_{\text{reduced}} = 8$, the memory requirement becom
     \caption{Evaluation framework proposed in this paper for benchmarking vector caches, used to evaluate QVCache.}
     \label{fig:evaluation-framework}
 \end{figure*}
+
+
+
+\begin{figure}[b]
+    \centering
+    \includegraphics[width=0.75\linewidth]{plots/noise_ratio_analysis/neighbor_overlap_analysis.pdf}
+    \caption{\textbf{Nearest Neighbor overlap under perturbation (DEEP \cite{deep} dataset, $k=10$).} The overlap between the neighbor sets of the base and perturbed queries decays sharply, approaching near-zero at a noise ratio of 0.5.}
+    \label{fig:overlap-analysis}
+\end{figure}

@@ -40,6 +40,7 @@ GloVe       & 1{,}000{,}000       & 100 & Cosine & 10{,}000 \\
 
 
 \subsection{Experimental Setup}
+\label{sec:experimental-setup}
 We implement QVCache in C++, together with Python bindings. All experiments are conducted on a Linux system in a containerized Docker environment, equipped with an Intel Xeon Gold 5118 processor, 2.30GHz, with 24 physical cores, 376GB of DDR4 RAM, and a Dell Express Flash PM1725a 1.6TB NVMe SSD.
 
 \textbf{Datasets.} We evaluate how well QVCache generalizes across diverse data by benchmarking it on five datasets that differ in scale, domain, and dimensionality, as summarized in Table~\ref{tab:datasets} \cite{sift, deep, gist, pennington-etal-2014-glove, SPACEV1B_SPTAG}. 
@@ -441,7 +442,7 @@ In summary, we recommend setting the total cache capacity $N$ (in vectors) large
 \label{sec:deviation-factor}
 The hyperparameter $D$, the deviation factor, gives users explicit control over the trade-off between recall and hit ratio. To quantify its effect, we repeat the experiment from Section~\ref{sec:dataset-experiments} on SIFT while varying $D$. The results in Figure~\ref{fig:deviation-factor-experiment} show that increasing $D$ improves the cache hit ratio at the cost of reduced recall. In practice, this trade-off exhibits a saturation effect: beyond a certain point, further increases in $D$ yield only marginal gains in hit ratio while incurring only small additional recall loss.
 
-We do not prescribe a single rule of thumb for choosing $D$. In our experiments in Section~\ref{sec:dataset-experiments}, we selected $D$ by starting from $0$ and incrementally increasing it, ensuring that the backend’s recall was maintained and monitoring the resulting hit ratios. Once the hit ratio stopped improving meaningfully, we stopped increasing $D$. This procedure can be performed online at runtime without any downtime.
+We do not prescribe a single rule of thumb for choosing $D$. In our experiments in Section~\ref{sec:dataset-experiments}, we selected $D$ by starting from $0$ and incrementally increasing it by $0.025$ at each step, ensuring that the backend’s recall was maintained and monitoring the resulting hit ratios. Once the hit ratio stopped improving meaningfully, we stopped increasing $D$. This procedure can be performed online at runtime without any downtime.
 
 
 %As shown in Figure~\ref{fig:spatial-threshold-experiment}, the global threshold aggregates updates from cache misses across all regions, failing to capture local patterns and causing up to a 15\% loss in recall due to incorrect hit/miss decisions. In contrast, spatial thresholds adapt to local variations in the query distribution, limiting recall degradation to at most 2–3\%, demonstrating their effectiveness in preserving the backend database’s accuracy.
