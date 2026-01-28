@@ -1,7 +1,29 @@
-\section{Evaluation Framework}
-Real-world vector search workloads exhibit skewed access patterns \cite{298625SmartANN, incrementalivfindexmaintenance}, with spatially close queries recurring (i.e., {temporal-semantic locality}), but existing systems are typically evaluated without accounting for this behavior, which is inadequate for assessing vector caches. Standard benchmarks execute each query only once and report aggregate metrics such as average recall and latency, which is sufficient for evaluating standalone ANN systems but insufficient for understanding the cache behavior. 
+\begin{figure*}[t]
+    \centering
+    \begin{subfigure}[t]{0.48\textwidth}
+        \centering
+        \includegraphics[width=\linewidth,trim=0 120 0 0,clip]{figures/perturbation.pdf}
+        \caption{Synthesizing queries with semantic (spatial) locality.}
+        \label{fig:query-perturbation}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[t]{0.48\textwidth}
+        \centering
+        \includegraphics[width=\linewidth,trim=0 120 0 0,clip]{figures/workload-generation.pdf}
+        \caption{Workload generation with temporal–semantic locality.}
+        \label{fig:sliding-window}
+    \end{subfigure}
+    \caption{Evaluation framework proposed in this paper for benchmarking vector caches, used to evaluate QVCache.}
+    \label{fig:evaluation-framework}
+    \vspace{-\baselineskip}
+\end{figure*}
 
-To address this, we propose a workload generation framework that produces query patterns exhibiting \textit{temporal-semantic locality} at varying degrees. As illustrated in Figure \ref{fig:query-perturbation}, we first partition the queries from the dataset into $N_{\text{split}}$ disjoint subsets to model shifts in the working set of the workload. 
+\section{Evaluation Framework}
+%Real-world vector search workloads exhibit skewed access patterns \cite{298625SmartANN, incrementalivfindexmaintenance}, with spatially close queries recurring (i.e., {temporal-semantic locality}), but existing systems are typically evaluated without accounting for this behavior, which is inadequate for assessing vector caches. Standard benchmarks execute each query only once and report aggregate metrics such as average recall and latency, which is sufficient for evaluating standalone ANN systems but insufficient for understanding the cache behavior. 
+
+Real-world vector search workloads exhibit skewed access patterns~\cite{298625SmartANN, incrementalivfindexmaintenance}, with spatially close queries recurring (i.e. \textit{temporal–semantic locality}). However, existing systems are typically evaluated without accounting for this behavior, which is inadequate for assessing vector caches. In standard benchmarks, queries provided in the datasets rarely have overlapping neighbors, and each query is executed only once; benchmarks then report aggregate metrics such as average recall and latency. While this is sufficient for evaluating standalone ANN systems, it is insufficient for understanding cache behavior due to the lack of temporal–semantic locality.
+
+To address this, we propose a workload generation framework that produces query patterns exhibiting temporal-semantic locality at varying degrees. As illustrated in Figure \ref{fig:query-perturbation}, we first partition the queries from the dataset into $N_{\text{split}}$ disjoint subsets to model shifts in the working set of the workload. 
 Within each subset (split), we generate perturbed variants for each query to model the temporal-semantic locality. For a query $q$, we sample a random vector $r$ from the data vectors in the dataset and produce  
 
 \begin{equation}
