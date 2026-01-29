@@ -47,8 +47,8 @@ We implement QVCache in C++, together with Python bindings. All experiments are 
 \textbf{Backends.} We evaluate QVCache across a range of backend databases to understand its performance under diverse scenarios. We employ the DiskANN \cite{diskann} implementation by Yu et al. (2025) \cite{yu2025topologyawarelocalizedupdatestrategy}, a state-of-the-art disk-based vector search framework, for benchmarking QVCache across multiple datasets. Additionally, we test QVCache with FAISS \cite{faiss}, pgvector \cite{pgvector}, Qdrant \cite{qdrant2025}, Pinecone \cite{pinecone}, and SPANN \cite{spann} to assess its effectiveness with backends that differ in storage model (in-memory, disk-based, or hybrid), deployment model (on-premises vs. cloud-based), and index type (graph, tree, etc.).
 
 \textbf{Metrics.} %We evaluate QVCache using six metrics, as illustrated in Figures \ref{fig:dataset-experiments} and \ref{fig:backend-experiments}. Metrics are collected at the granularity of window steps, with each dot representing a step. 
-We evaluate QVCache across six metrics measured per window, with values reported at window-step granularity, where each point in the figures corresponds to a single step.
-\emph{Cache hit ratio} measures the fraction of queries served by QVCache without forwarding requests to the backend database, while \emph{Hit latency} captures the latency of these queries. We use P50 latency and omit P99 latency because, unless QVCache achieves a hit ratio above 99\%, P99 is dominated by queries that miss the cache and are served by the backend, yielding no meaningful distinction when using QVCache. %Instead, we use P50 latency to evaluate overall latency performance. %, independent of cache hits or misses.
+We evaluate QVCache across six metrics with values reported at window-step granularity, %where each point in the figures corresponds to a single step.
+\emph{Cache hit ratio} measures the fraction of queries served by QVCache without forwarding requests to the backend database, while \emph{Hit latency} captures the latency of these queries. We use P50 latency and omit P99 latency because, unless QVCache achieves a hit ratio above 99\%, P99 is dominated by queries that miss the cache and are served by the backend. %yielding no meaningful distinction when using QVCache. %Instead, we use P50 latency to evaluate overall latency performance. %, independent of cache hits or misses.
 Although QVCache is primarily designed for low-latency responses, it also improves throughput; we report the metric reflecting this benefit. To measure query accuracy, we use 10-recall@10. We also track the number of vectors retrieved from the backend into the cache over time to assess eviction behavior. 
 
 \begin{figure}[h]
@@ -78,6 +78,7 @@ Although QVCache is primarily designed for low-latency responses, it also improv
 
     \caption{Effect of varying $k$ on the SIFT dataset. Cache capacity is 100{,}000 for $k = 10$ and is scaled linearly with $k$ (downscaled for $k = 1$ and upscaled for $k = 100$).}
     \label{fig:k-experiments}
+    \vspace{-\baselineskip}
 \end{figure}
 
 
@@ -237,7 +238,7 @@ The workloads in Figures \ref{fig:k-experiments} and \ref{fig:dataset-experiment
 
 QVCache is configured with $\alpha = 0.9$ (adaptivity rate), $n_{\text{buckets}} = 8$, and $d_{\text{reduced}} = 16$. The \texttt{ADAPTIVE} search strategy is applied. We set $D$ to 0.25 for SIFT and SpaceV, and to 0.075 for the remaining datasets. The cache capacity is fixed at 100{,}000 vectors and partitioned into $n_{\text{mini-index}} = 4$ mini-indexes, each with a capacity of 25{,}000.
 
-In Figure~\ref{fig:dataset-experiments}, when the working set stays stable for three consecutive window steps (i.e., the window shifts vertically in Figure~\ref{fig:sliding-window}), the hit ratio steadily increases as QVCache fills its mini-indexes with vectors from the active working set. Every third step, the working set changes by approximately 25\% (corresponding to a diagonal slide in Figure~\ref{fig:sliding-window}), which leads to a matching $\approx 25\%$ drop in hit ratio. For example, with a stride of 2, this drop would be $\approx 50\%$. Throughput also exhibits a fluctuating pattern, driven by changes in the hit rate.
+In Figure~\ref{fig:dataset-experiments}, when the working set stays stable for three consecutive window steps (i.e., the window shifts vertically in Figure~\ref{fig:sliding-window}), the hit ratio steadily increases as QVCache fills its mini-indexes with vectors from the active working set. Every third step, the working set changes by approximately 25\% (corresponding to a diagonal slide in Figure~\ref{fig:sliding-window}), which leads to a matching $\approx 25\%$ drop in hit ratio. %For example, with a stride of 2, this drop would be $\approx 50\%$. Throughput also exhibits a fluctuating pattern, driven by changes in the hit rate.
 
 Queries that result in a cache hit have sub-millisecond latencies, typically between 0.1 and 1~ms. These high hit ratios, combined with sub-millisecond hit latencies, yield up to 60–300$\times$ lower p50 latency compared to using DiskANN only without QVCache.
 
@@ -330,6 +331,10 @@ Even for fully in-memory backends such as FAISS, QVCache achieves up to 40$\time
 
 %In summary, augmenting a state-of-the-art in-memory backend such as FAISS with QVCache results in approximately $40$$\times$ lower p50 latency. For disk-based vector search systems, augmenting them with QVCache yields $\approx 100$–$ 500$$\times$ reductions in p50 latency, and for cloud-hosted systems such as Pinecone, the benefit is magnified to nearly $1000$$\times$ by eliminating network latency on cache hits.
 
+\subsection{Spatial Thresholds vs. Global Threshold}
+\label{sec:spatial-thresholds}
+Vector distributions vary significantly across the vector space: some regions are densely clustered, while others are sparse. This heterogeneity makes it impractical to rely on a single global similarity threshold for all cache hit decisions.
+
 \begin{figure}[t]
     \centering
 
@@ -343,11 +348,6 @@ Even for fully in-memory backends such as FAISS, QVCache achieves up to 40$\time
     \label{fig:spatial-threshold-experiment}
     \vspace{-\baselineskip}
 \end{figure}
-
-%\subsection{Spatial Thresholds Are Key to Correct Cache Hit/Miss Decisions}
-\subsection{Spatial Thresholds vs. Global Threshold}
-\label{sec:spatial-thresholds}
-Vector distributions vary significantly across the vector space: some regions are densely clustered, while others are sparse. This heterogeneity makes it impractical to rely on a single global similarity threshold for all cache hit decisions.
 
 To evaluate this effect, we repeated the experiment from Section \ref{sec:dataset-experiments} on the SIFT dataset under two configurations: one using a single global threshold and the other using spatial thresholds. As shown in Figure~\ref{fig:spatial-threshold-experiment}, using spatial thresholds preserves recall with at most a 2–3\% drop, whereas a single global threshold can incur losses of up to 16\%. The underlying reason is that spatial thresholds learn locally appropriate hit/miss sensitivities, while a single global threshold fails to capture local variations and thus degrades recall.
 
@@ -374,7 +374,7 @@ As discussed in Section~\ref{sec:mini-indexes}, given a fixed cache capacity, we
     \label{fig:granularity-effect}
 \end{figure}
 
-To further analyze this trade-off, we conducted the experiment shown in Figure~\ref{fig:granularity-effect} using the SpaceV dataset. We fixed the total cache capacity and varied the number of mini-indexes, $n_{\text{mini-index}}$, which implicitly determines the capacity of each mini-index, $c_{\text{mini-index}}$. As $n_{\text{mini-index}}$ increases, the average cache-hit latency rises, since the scanning strategy must probe a larger number of mini-indexes before identifying a confident candidate neighbor set (Equation \ref{exp:cache-search-cost}). Conversely, eviction cost increases as $n_{\text{mini-index}}$ decreases, as evidenced by the sharp drops in cache vectors for $n_{\text{mini-index}}=1$ and $n_{\text{mini-index}}=2$ in Figure~\ref{fig:granularity-effect}, indicating large, bursty eviction events and increased eviction-induced information loss.
+To further analyze this trade-off, we conducted the experiment shown in Figure~\ref{fig:granularity-effect} using the SpaceV dataset. We fixed the total cache capacity and varied the number of mini-indexes, $n_{\text{mini-index}}$, which implicitly determines the capacity of each mini-index, $c_{\text{mini-index}}$. As $n_{\text{mini-index}}$ increases, the average cache-hit latency rises, since the scanning strategy must probe a larger number of mini-indexes before identifying a confident candidate neighbor set (Equation \ref{exp:cache-search-cost}). Conversely, eviction cost increases as $n_{\text{mini-index}}$ decreases, as evidenced by the sharp drops in cache vectors for $n_{\text{mini-index}}=1$ and $n_{\text{mini-index}}=2$ in Figure~\ref{fig:granularity-effect}, indicating large, bursty eviction events and increased eviction-induced information loss. Accordingly, we choose $n_{\text{mini-index}} = 4$ as a balanced operating point between eviction-induced information loss and cache-hit latency.
 
 
 
@@ -414,14 +414,13 @@ Left: varying total cache capacity via $n_{\text{mini-index}}$ with fixed $c_{\t
 Right: varying $c_{\text{mini-index}}$ with fixed total capacity.
 }
 \label{fig:cache_size_experiments}
-\vspace{-\baselineskip}
 \end{figure}
 
 \subsection{Sensitivity to Cache Capacity and Mini Index Partitioning}
 \label{sec:cache-capacity-mini-index-partitioning}
 %As first noted by Belady~\cite{belady1966study}, an ideal cache would retain exactly the items that will be accessed again and evict only those that will never be referenced in the future. Such optimal behavior is attainable only with an unbounded cache or with an oracle that perfectly predicts future accesses. Since neither assumption is practical, real systems are inherently constrained by finite capacity and imperfect eviction decisions. The same limitations apply to QVCache.
 
-To see how well QVCache captures cache hits under varying cache capacities and varying mini-index sizes, we repeat the experiment from Figure~\ref{fig:dataset-experiments} on the SIFT dataset with $N_{\text{round}} = 2$ (to evaluate how well it detects cache hits when revisiting the same window with newly perturbed queries), as shown in Figure~\ref{fig:cache_size_experiments}.
+To see how well QVCache captures cache hits under varying cache capacities and varying mini-index sizes, we repeat the experiment from Figure~\ref{fig:dataset-experiments} on the SIFT dataset with $N_{\text{round}} = 2$ as shown in Figure~\ref{fig:cache_size_experiments}.
 
 For the generated workload we have $4$ perturbed copies ($C_{i,j}$'s in Figure \ref{fig:evaluation-framework}) of each split $S_i$ since $WINDOW\_SIZE = 4$. Each perturbed copy of a split, brings approximately $15{,}000$ vectors into the cache. Therefore, the working set size of the workload, $w$, becomes $60{,}000$. Since $\textit{stride} = 1$, approximately one quarter of the working set changes at each window slide (every $N_{repeat} =3$ window steps).
 
@@ -439,7 +438,6 @@ For partitioning the cache capacity, we recommend first estimating the working s
 
 
 
-
 \begin{figure}[h]
     \centering
     \begin{subfigure}{0.48\linewidth}
@@ -451,7 +449,7 @@ For partitioning the cache capacity, we recommend first estimating the working s
         \includegraphics[width=\linewidth]{plots/deviation_factor_experiments/recall.pdf}
     \end{subfigure}
 
-    \caption{Deviation Factor Effect on Hit Ratio - Recall on SIFT}
+    \caption{Deviation Factor Effect on Hit Ratio - Recall on SIFT.}
     \label{fig:deviation-factor-experiment}
     \vspace{-\baselineskip}
 \end{figure}
@@ -574,7 +572,8 @@ $n_{\text{mini-index}}$ and $c_{\text{mini-index}}$ (in vectors) on SIFT.}
 
 For a billion-scale dataset such as SIFT, DiskANN requires 33.5GB of memory, and in-memory backends like FAISS can reach into the hundreds of gigabytes. By comparison, adding QVCache with a capacity of 100{,}000 vectors incurs only 100–200MB of additional memory. As expected, memory usage grows linearly with total cache capacity (and with vector dimensionality), and we observe that partitioning across multiple mini-indexes further increases overhead, as indicated by the diagonals in Table~\ref{tab:memory-footprint-experiment}. However, this overhead remains negligible relative to the memory consumed by the backends. Even with a very generous QVCache budget (e.g., 1M vectors), the additional cost for SIFT is only about 1–2GB.
 
-The memory required to store distance thresholds is also negligible and is already included in the numbers reported in Table~\ref{tab:memory-footprint-experiment}. For example, in Figure~\ref{fig:dataset-experiments}, QVCache learns roughly 1.5K, 15K, and 50K thresholds for GIST, SIFT, and SpaceV, respectively, consuming about 200KB for SpaceV. Even under pessimistic assumptions where, for instance, one million thresholds are learned due to highly diverse queries or varying values of $k$, the footprint remains around 4MB. Users may optionally cap the number of stored thresholds, evicting and relearning them if needed. Overall, threshold storage contributes insignificantly to QVCache’s memory usage.
+The memory required to store distance thresholds is also negligible and is already included in the numbers reported in Table~\ref{tab:memory-footprint-experiment}. For example, in Figure~\ref{fig:dataset-experiments}, QVCache learns roughly 1.5K, 15K, and 50K thresholds for GIST, SIFT, and SpaceV, respectively, consuming about 200KB for SpaceV. %Even under pessimistic assumptions where, for instance, one million thresholds are learned due to highly diverse queries or varying values of $k$, the footprint remains around 4MB.%
+Users may optionally cap the number of stored thresholds, evicting and relearning them if needed. %Overall, threshold storage contributes insignificantly to QVCache’s memory usage.
 
 \begin{figure}[h]
     \centering
@@ -611,7 +610,8 @@ The memory required to store distance thresholds is also negligible and is alrea
 
 We next study the robustness of QVCache to different degrees of query perturbation~$\eta$. In Figure~\ref{fig:noise-ratio-experiments}, we evaluate the effect of~$\eta$ by repeating the experiment from Section~\ref{sec:dataset-experiments} while increasing $\eta$ up to~0.6. To avoid triggering evictions and focus solely on how many vectors QVCache retrieves into the cache, we set the cache capacity to $1$M vectors. As shown in Figure~\ref{fig:overlap-analysis}, $\eta = 0.6$ represents an extreme case in which perturbed queries share no overlap in their top-$k$ neighbors. Even under this setting, QVCache sustains high achieve ratios while degrading recall by less than~4\%.
 
-This result reveals an important phenomenon: pairwise dissimilarity among queries does not imply global dissimilarity across a workload. Although no two perturbed queries share top-$k$ neighbors, the collective set of vectors they reference still exhibits overlap at scale , i.e. under high query concurrency and volume. This is reflected in the curves for $\eta = 0.4$ and $\eta = 0.6$, where the number of vectors inserted into the cache increases only modestly. Thus, QVCache may remain effective even when similar queries do not repeat, leveraging collaboration across many unique queries rather than relying solely on strict temporal–semantic locality.
+This result reveals an important phenomenon: pairwise dissimilarity among queries does not imply global dissimilarity across a workload. Although no two perturbed queries share top-$k$ nearest neighbors, the collective set of vectors they reference still exhibits overlap at scale, i.e. under high query concurrency and volume. This is reflected in the curves for $\eta = 0.4$ and $\eta = 0.6$, where the number of vectors inserted into the cache increases only modestly. 
+Concretely, although the workload issues 84{,}000 queries in total, the settings $\eta = 0.4$ and $\eta = 0.6$ lead to fewer than 300{,}000 vectors being inserted into the cache, far below the 840{,}000 vectors that would be expected in the absence of any pairwise top-$k$ neighbor overlap (with $k = 10$). Thus, QVCache may remain effective even when similar queries do not repeat, leveraging collaboration across many dissimilar queries (indicated by the cache hit ratio around 0.75 in Figure \ref{fig:noise-ratio-experiments}) rather than relying solely on temporal–semantic locality.
 
 
 
